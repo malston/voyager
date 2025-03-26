@@ -1,0 +1,88 @@
+resource_types:
+  - name: github-release
+    type: registry-image
+    source:
+      repository: concourse/github-release-resource
+      tag: latest
+
+resources:
+  - name: source-code
+    type: git
+    source:
+      uri: https://github.com/{{owner}}/{{repo}}.git
+      branch: main
+      
+  - name: github-release
+    type: github-release
+    source:
+      owner: {{owner}}
+      repository: {{repo}}
+      access_token: ((github_token))
+
+jobs:
+  - name: build-and-release
+    plan:
+      - get: source-code
+        trigger: false
+      
+      - task: build
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: python, tag: 3.9-slim}
+          inputs:
+            - name: source-code
+          outputs:
+            - name: built-release
+          params:
+            VERSION: ((version))
+          run:
+            path: sh
+            args:
+              - -exc
+              - |
+                cd source-code
+                echo "Building version ${VERSION}"
+                pip install -e .
+                python setup.py sdist bdist_wheel
+                cp dist/* ../built-release/
+      
+      - put: github-release
+        params:
+          name: v((version))
+          tag: v((version))
+          globs: ["built-release/*.tar.gz", "built-release/*.whl"]
+
+  - name: rollback
+    plan:
+      - get: source-code
+        passed: [build-and-release]
+      
+      - task: prepare-rollback
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: python, tag: 3.9-slim}
+          inputs:
+            - name: source-code
+          outputs:
+            - name: rollback-info
+          params:
+            VERSION: ((version))
+            IS_ROLLBACK: ((is_rollback))
+          run:
+            path: sh
+            args:
+              - -exc
+              - |
+                if [ "${IS_ROLLBACK}" == "true" ]; then
+                  echo "Executing rollback to version ${VERSION}"
+                  # Add rollback-specific steps here
+                  echo "${VERSION}" > rollback-info/rollback-version.txt
+                  echo "Rollback prepared successfully"
+                else
+                  echo "Not a rollback operation, skipping"
+                  exit 0
+                fi

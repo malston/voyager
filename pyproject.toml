@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "voyager"
+version = "0.1.0"
+description = "A tool for managing GitHub releases with Concourse CI pipelines"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+dependencies = [
+    "click>=8.0.0",
+    "gitpython>=3.1.0",
+    "requests>=2.25.0",
+    "semver>=2.13.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+voyager = "voyager.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["voyager"]

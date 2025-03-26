@@ -9,6 +9,21 @@ description = "A tool for managing GitHub releases with Concourse CI pipelines"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
+authors = [
+    {name = "Mark Alston", email = "marktalston@gmail.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Version Control :: Git",
+]
 dependencies = [
     "click>=8.0.0",
     "gitpython>=3.1.0",
@@ -17,8 +32,37 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.2.0",
+    "build>=1.0.0",
+    "twine>=4.0.0",
+    "pip-audit>=2.5.0",
+]
+
 [project.scripts]
 voyager = "voyager.cli:cli"
 
+[project.urls]
+"Homepage" = "https://github.com/malston/voyager"
+"Bug Tracker" = "https://github.com/malston/voyager/issues"
+
 [tool.hatch.build.targets.wheel]
 packages = ["voyager"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "--cov=voyager --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = ["E", "F", "B", "I", "W"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+line-ending = "auto"

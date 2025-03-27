@@ -47,7 +47,7 @@ venv:
 		uv venv; \
 	else \
 		echo "uv not found. Please install uv first:"; \
-		echo "  curl -sSf https://astral.sh/uv/install.sh | sh"; \
+		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh; \
 		exit 1; \
 	fi
 	@echo "Virtual environment created in .venv directory"

@@ -17,6 +17,7 @@ ENV/
 .env
 .vscode/
 .idea/
+.coverage
 
 # Logs
 *.log

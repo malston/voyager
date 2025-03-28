@@ -24,8 +24,15 @@ help:
 
 # Set up the development environment with mise and uv
 setup:
-	@echo "Creating .mise.toml file..."
-	@echo '[tools]\npython = "$(PYTHON_VERSION)"\n\n[env]\n_.python.venv = ".venv"' > .mise.toml
+	@if command -v mise >/dev/null 2>&1; then \
+		echo "mise is already set up, skipping mise installation"; \
+	else \
+		echo "mise not found, installing..."; \
+		echo "You can install mise with:"; \
+		echo "  curl https://mise.run | sh"; \
+		echo ""; \
+		echo "Setup will continue, but you should install uv separately for best results."; \
+	fi
 	@echo "Installing mise Python $(PYTHON_VERSION)..."
 	@mise install python
 	@echo "Checking for uv installation..."
@@ -34,7 +41,7 @@ setup:
 	else \
 		echo "uv not found, installing..."; \
 		echo "You can install uv with:"; \
-		echo "  curl -sSf https://astral.sh/uv/install.sh | sh"; \
+		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
 		echo ""; \
 		echo "Setup will continue, but you should install uv separately for best results."; \
 	fi
@@ -156,10 +163,16 @@ check-env:
 		echo "✗ Virtual environment not found. Run 'make venv'"; \
 		exit 1; \
 	fi
+	@if command -v mise >/dev/null 2>&1; then \
+		echo "✓ mise installed"; \
+	else \
+		echo "✗ mise not found. Install with: curl https://mise.run | sh"; \
+		exit 1; \
+	fi
 	@if command -v uv >/dev/null 2>&1; then \
 		echo "✓ uv installed"; \
 	else \
-		echo "✗ uv not found. Install with: curl -sSf https://astral.sh/uv/install.sh | sh"; \
+		echo "✗ uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"; \
 		exit 1; \
 	fi
 	@if [ -f "pyproject.toml" ]; then \

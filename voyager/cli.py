@@ -7,13 +7,15 @@ from pathlib import Path
 
 from . import __version__
 
+
 @click.group()
 @click.version_option(version=__version__)
 def cli():
     """Voyager - A tool for managing GitHub releases with Concourse CI pipelines."""
     pass
 
-# Import commands 
+
+# Import commands
 # Note: these would be implemented in separate files
 # Each command file should be created in the commands/ directory
 from .commands.release import create_release

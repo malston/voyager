@@ -6,6 +6,7 @@ import click
 from ..concourse import ConcourseClient
 from ..utils import check_git_repo, get_repo_info
 
+
 @click.command('pipelines')
 @click.option('--limit', '-l', default=5, help='Limit the number of pipelines shown')
 @click.option('--concourse-url', required=True, help='Concourse CI API URL')
@@ -14,16 +15,16 @@ from ..utils import check_git_repo, get_repo_info
 def list_pipelines(limit, concourse_url, concourse_team, pipeline):
     """List recent release pipelines/builds."""
     if not check_git_repo():
-        click.echo("Error: Current directory is not a git repository", err=True)
+        click.echo('Error: Current directory is not a git repository', err=True)
         sys.exit(1)
-    
+
     try:
         owner, repo = get_repo_info()
-        click.echo(f"Fetching recent builds for {owner}/{repo}...")
-        
+        click.echo(f'Fetching recent builds for {owner}/{repo}...')
+
         # Full implementation would go here
-        click.echo("Pipelines command not fully implemented yet.")
-    
+        click.echo('Pipelines command not fully implemented yet.')
+
     except Exception as e:
-        click.echo(f"Error listing pipelines: {str(e)}", err=True)
+        click.echo(f'Error listing pipelines: {str(e)}', err=True)
         sys.exit(1)

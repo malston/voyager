@@ -61,6 +61,8 @@ addopts = "--cov=voyager --cov-report=term-missing"
 [tool.ruff]
 line-length = 100
 target-version = "py38"
+
+[tool.ruff.lint]
 select = ["E", "F", "B", "I", "W"]
 
 [tool.ruff.format]

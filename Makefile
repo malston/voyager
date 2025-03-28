@@ -47,7 +47,7 @@ venv:
 		uv venv; \
 	else \
 		echo "uv not found. Please install uv first:"; \
-		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh; \
+		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
 		exit 1; \
 	fi
 	@echo "Virtual environment created in .venv directory"
@@ -57,7 +57,7 @@ install:
 	@echo "Installing development dependencies and package..."
 	@if ! command -v uv >/dev/null 2>&1; then \
 		echo "uv not found. Please install uv first:"; \
-		echo "  curl -sSf https://astral.sh/uv/install.sh | sh"; \
+		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
 		exit 1; \
 	fi
 	@uv pip install -e ".[dev]"

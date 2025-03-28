@@ -1,0 +1,50 @@
+[tools]
+python = "3.13"
+
+[env]
+_.python.venv = ".venv"
+
+[tasks.default]
+hide = true
+quiet = true
+run = """echo 'Welcome to the development environment setup!
+Available tasks:
+  mise setup     - Set up development environment with mise
+  mise venv      - Create a virtual environment using uv
+  mise install   - Install dependencies and package in development mode
+  mise dev       - Complete development setup (venv + install)
+  mise activate  - Show instructions to activate virtual environment
+  mise test      - Run tests
+  mise lint      - Run linting checks (ruff)
+  mise format    - Format code (ruff format)
+  mise clean     - Remove build artifacts and cache directories
+  mise build     - Build package distribution files
+  mise publish   - Publish package to PyPI (requires credentials)
+  mise check-env - Check if development environment is properly set up
+  mise tasks     - See all available tasks'
+"""
+
+[tasks.venv]
+run = "uv venv"
+description = "Create a virtual environment with uv"
+
+[tasks.install]
+run = "uv pip install -e '.[dev]'"
+depends = ["venv"]
+description = "Install the package in editable mode"
+
+[tasks.activate]
+hide = true
+quiet = true
+run = """echo 'To activate the virtual environment, run:
+source .venv/bin/activate
+
+To deactivate, simply run:
+deactivate'"""
+
+[tasks.dev]
+run = "echo Development environment setup complete"
+quiet = true
+depends = ["venv", "install"]
+depends_post = ["activate"]
+description = "Set up the development environment"

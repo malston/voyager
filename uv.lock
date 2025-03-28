@@ -1483,6 +1483,7 @@ dependencies = [
     { name = "gitpython" },
     { name = "pyyaml" },
     { name = "requests" },
+    { name = "ruff" },
     { name = "semver" },
 ]
 
@@ -1508,6 +1509,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", specifier = ">=2.25.0" },
+    { name = "ruff", specifier = ">=0.11.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.2.0" },
     { name = "semver", specifier = ">=2.13.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=4.0.0" },

@@ -10,9 +10,10 @@ from datetime import datetime
 from ..github import GitHubClient
 from ..concourse import ConcourseClient
 from ..utils import check_git_repo, get_repo_info
+from ..click_utils import CONTEXT_SETTINGS
 
 
-@click.command('rollback')
+@click.command('rollback', context_settings=CONTEXT_SETTINGS)
 @click.option('--tag', '-t', help='Specific tag to rollback to')
 @click.option('--dry-run', '-d', is_flag=True, help='Perform a dry run without actual rollback')
 @click.option('--concourse-url', help='Concourse CI API URL')

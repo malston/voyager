@@ -7,9 +7,10 @@ from tabulate import tabulate
 
 from ..github import GitHubClient
 from ..utils import check_git_repo, get_repo_info
+from ..click_utils import CONTEXT_SETTINGS
 
 
-@click.command('list')
+@click.command('list', context_settings=CONTEXT_SETTINGS)
 @click.option('--limit', '-l', default=10, help='Limit the number of releases shown')
 @click.option(
     '--format', '-f', type=click.Choice(['table', 'json']), default='table', help='Output format'

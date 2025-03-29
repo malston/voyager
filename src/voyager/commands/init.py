@@ -9,9 +9,10 @@ import shutil
 import git
 
 from ..utils import check_git_repo, get_repo_info
+from ..click_utils import CONTEXT_SETTINGS
 
 
-@click.command('init')
+@click.command('init', context_settings=CONTEXT_SETTINGS)
 @click.option('--concourse-url', help='Concourse CI API URL')
 @click.option('--concourse-team', help='Concourse CI team name')
 @click.option('--pipeline', help='Concourse pipeline name')

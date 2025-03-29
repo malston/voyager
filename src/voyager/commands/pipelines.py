@@ -7,9 +7,10 @@ from tabulate import tabulate
 
 from ..concourse import ConcourseClient
 from ..utils import check_git_repo, get_repo_info
+from ..click_utils import CONTEXT_SETTINGS
 
 
-@click.command('pipelines')
+@click.command('pipelines', context_settings=CONTEXT_SETTINGS)
 @click.option('--limit', '-l', default=5, help='Limit the number of pipelines shown')
 @click.option('--concourse-url', required=True, help='Concourse CI API URL')
 @click.option('--concourse-team', required=True, help='Concourse CI team name')

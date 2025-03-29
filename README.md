@@ -1,5 +1,7 @@
 # Voyager
 
+![img](./docs/img/voyager-logo.svg)
+
 A Python-based command-line tool for managing GitHub releases with Concourse CI integration.
 
 ## Features

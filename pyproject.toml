@@ -51,7 +51,7 @@ voyager = "voyager.cli:cli"
 "Bug Tracker" = "https://github.com/malston/voyager/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["voyager"]
+packages = ["src/voyager"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

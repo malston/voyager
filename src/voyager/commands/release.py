@@ -10,9 +10,10 @@ from datetime import datetime
 from ..github import GitHubClient
 from ..concourse import ConcourseClient
 from ..utils import check_git_repo, get_repo_info
+from ..click_utils import CONTEXT_SETTINGS
 
 
-@click.command('release')
+@click.command('release', context_settings=CONTEXT_SETTINGS)
 @click.option(
     '--type',
     '-t',

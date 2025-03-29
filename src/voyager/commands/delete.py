@@ -6,9 +6,10 @@ from datetime import datetime
 
 from ..github import GitHubClient
 from ..utils import check_git_repo, get_repo_info
+from ..click_utils import CONTEXT_SETTINGS
 
 
-@click.command('delete')
+@click.command('delete', context_settings=CONTEXT_SETTINGS)
 @click.option('--tag', '-t', help='Specific tag to delete')
 @click.option('--force', '-f', is_flag=True, help='Force deletion without confirmation')
 def delete_release(tag, force):

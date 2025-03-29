@@ -183,14 +183,6 @@ check-env:
 	fi
 	@echo "Environment check complete. Development setup looks good!"
 
-# Initialize a basic test structure
-init-tests:
-	@echo "Initializing basic test structure..."
-	@mkdir -p $(TEST_DIR)
-	@touch $(TEST_DIR)/__init__.py
-	@echo 'import pytest\nfrom voyager import cli\n\ndef test_cli_version():\n    assert hasattr(cli, "cli")' > $(TEST_DIR)/test_cli.py
-	@echo "Test structure initialized. Run 'make test' to execute tests."
-
 # Check all dependencies for security vulnerabilities
 security:
 	@echo "Checking dependencies for security vulnerabilities..."

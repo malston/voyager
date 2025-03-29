@@ -109,7 +109,7 @@ def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
         # Commit changes
         commit_message = f'Rollback to {tag}'
         click.echo(f'Committing version change: {commit_message}')
-        git_repo.git.add('voyager/__init__.py')
+        git_repo.git.add('src/voyager/__init__.py')
         git_repo.git.commit('-m', commit_message)
 
         # Push the rollback branch
@@ -180,7 +180,7 @@ Rolled back on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 def update_version_in_code(git_repo, version):
     """Update the version in the package __init__.py file."""
     try:
-        init_file = os.path.join(git_repo.working_dir, 'voyager', '__init__.py')
+        init_file = os.path.join(git_repo.working_dir, 'src', 'voyager', '__init__.py')
 
         with open(init_file, 'r') as f:
             content = f.read()

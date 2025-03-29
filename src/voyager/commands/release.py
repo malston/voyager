@@ -4,6 +4,7 @@ import os
 import sys
 import click
 import git
+import re
 import semver
 from datetime import datetime
 
@@ -95,7 +96,7 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         # Commit changes
         commit_message = f'Bump version to {new_version}'
         click.echo(f'Committing version change: {commit_message}')
-        git_repo.git.add('voyager/__init__.py')
+        git_repo.git.add('src/voyager/__init__.py')
         git_repo.git.commit('-m', commit_message)
 
         # Create tag
@@ -153,7 +154,7 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 def get_current_version(git_repo):
     """Get the current version from the package."""
     try:
-        with open(os.path.join(git_repo.working_dir, 'voyager', '__init__.py'), 'r') as f:
+        with open(os.path.join(git_repo.working_dir, 'src', 'voyager', '__init__.py'), 'r') as f:
             content = f.read()
             version_match = re.search(r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]', content)
             if version_match:
@@ -175,7 +176,7 @@ def get_current_version(git_repo):
 def update_version_in_code(new_version):
     """Update the version in the package __init__.py file."""
     try:
-        init_file = os.path.join('voyager', '__init__.py')
+        init_file = os.path.join('src', 'voyager', '__init__.py')
 
         with open(init_file, 'r') as f:
             content = f.read()

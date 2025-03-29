@@ -3,7 +3,7 @@
 .PHONY: setup venv install dev test lint format clean build publish activate security check-env help
 
 PYTHON_VERSION ?= 3.13
-SRC_DIR = voyager
+SRC_DIR = src/voyager
 TEST_DIR = tests
 
 # Default target when just running 'make'

@@ -1,40 +1,52 @@
 #!/bin/bash
 # Script to set the Concourse pipeline
 
-if [ -z "$CONCOURSE_TOKEN" ]; then
-    echo "Error: CONCOURSE_TOKEN environment variable is not set"
-    exit 1
-fi
-
 if [ -z "$GITHUB_TOKEN" ]; then
     echo "Error: GITHUB_TOKEN environment variable is not set"
     exit 1
 fi
 
 # These values should be set by the user
-CONCOURSE_URL="YOUR_CONCOURSE_URL"
-TEAM="YOUR_TEAM_NAME"
+TARGET="main" # Default target name, can be changed by user
 PIPELINE="release-pipeline"
+RELEASE_BODY="Release notes for the new version"
 
-# Get the current directory name as the repo name
-REPO_NAME=$(basename $(pwd))
-# Get the github username - this is a placeholder, user should modify
-OWNER="YOUR_GITHUB_USERNAME"
+usage() {
+    cat << EOF
+Usage:
+    $0 [-t target] [-u url] [-p pipeline_name]
 
-# Make the script executable
-chmod +x ci/set-pipeline.sh
+Options:
+   -t target         Name of the concourse target to use. (default: $TARGET)
 
-echo "Setting up Concourse pipeline for $OWNER/$REPO_NAME"
+   -u url            URL of the Concourse server. (default: $CONCOURSE_URL)
 
-# Replace placeholders in pipeline.yml
-sed -i "s/{{owner}}/$OWNER/g" ci/pipeline.yml
-sed -i "s/{{repo}}/$REPO_NAME/g" ci/pipeline.yml
+   -p pipeline_name  Name of the pipeline to set. (default: $PIPELINE)
 
-# Command to set the pipeline (uncomment when ready to use)
-# fly -t $TEAM login -c $CONCOURSE_URL -n $TEAM
-# fly -t $TEAM set-pipeline -p $PIPELINE -c ci/pipeline.yml \
-#    -v github_token=$GITHUB_TOKEN \
-#    -v version="0.1.0"
+   -h Help. Displays this message
+EOF
+}
 
-echo "Pipeline prepared. Edit ci/set-pipeline.sh with your Concourse details and uncomment the fly commands to set up the pipeline."
-echo "Then run: ./ci/set-pipeline.sh"
+while [[ $1 =~ ^- && $1 != "--" ]]; do
+    case $1 in
+        -t | --target)
+            shift
+            TARGET=$1
+            ;;
+        -p | --pipeline)
+            shift
+            PIPELINE=$1
+            ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+    esac
+    shift
+done
+if [[ $1 == '--' ]]; then shift; fi
+
+fly -t "$TARGET" set-pipeline -p "$PIPELINE" -c ci/pipeline.yml \
+    -v github_token="$GITHUB_TOKEN" \
+    -v release_body="$RELEASE_BODY" \
+    -v version="0.1.0"

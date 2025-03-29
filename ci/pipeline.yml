@@ -9,14 +9,14 @@ resources:
   - name: source-code
     type: git
     source:
-      uri: https://github.com/{{owner}}/{{repo}}.git
+      uri: https://github.com/malston/voyager.git
       branch: main
       
   - name: github-release
     type: github-release
     source:
-      owner: {{owner}}
-      repository: {{repo}}
+      owner: malston
+      repository: voyager
       access_token: ((github_token))
 
 jobs:
@@ -37,52 +37,31 @@ jobs:
             - name: built-release
           params:
             VERSION: ((version))
+            BODY: ((release_body))
           run:
             path: sh
             args:
-              - -exc
+              - -ec
               - |
                 cd source-code
                 echo "Building version ${VERSION}"
-                pip install -e .
-                python setup.py sdist bdist_wheel
+                python -m pip install --upgrade pip
+                pip install build twine
+                pip install -r requirements.txt
+                python -m build
                 cp dist/* ../built-release/
+                ls -al ../built-release/
+                apt-get update -y && apt-get install git -y
+                git rev-parse HEAD >../built-release/COMMITISH
+                echo "v${VERSION}" >../built-release/release_name.txt
+                echo "v${VERSION}" >../built-release/release_tag.txt
+                echo "${BODY}" >../built-release/release_body.txt
       
       - put: github-release
         params:
-          name: v((version))
-          tag: v((version))
+          name: built-release/release_name.txt
+          tag: built-release/release_tag.txt
+          body: built-release/release_body.txt
+          commitish: built-release/COMMITISH
+          generate_release_notes: true
           globs: ["built-release/*.tar.gz", "built-release/*.whl"]
-
-  - name: rollback
-    plan:
-      - get: source-code
-        passed: [build-and-release]
-      
-      - task: prepare-rollback
-        config:
-          platform: linux
-          image_resource:
-            type: registry-image
-            source: {repository: python, tag: 3.9-slim}
-          inputs:
-            - name: source-code
-          outputs:
-            - name: rollback-info
-          params:
-            VERSION: ((version))
-            IS_ROLLBACK: ((is_rollback))
-          run:
-            path: sh
-            args:
-              - -exc
-              - |
-                if [ "${IS_ROLLBACK}" == "true" ]; then
-                  echo "Executing rollback to version ${VERSION}"
-                  # Add rollback-specific steps here
-                  echo "${VERSION}" > rollback-info/rollback-version.txt
-                  echo "Rollback prepared successfully"
-                else
-                  echo "Not a rollback operation, skipping"
-                  exit 0
-                fi

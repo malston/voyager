@@ -2,10 +2,11 @@
 
 import os
 import sys
+import re
 import click
 import git
-import re
 import semver
+from pathlib import Path
 from datetime import datetime
 
 from ..github import GitHubClient
@@ -31,7 +32,23 @@ from ..click_utils import CONTEXT_SETTINGS
 @click.option('--concourse-team', help='Concourse CI team name')
 @click.option('--pipeline', help='Concourse pipeline name to trigger')
 @click.option('--job', default='build-and-release', help='Concourse job name to trigger')
-def create_release(type, message, branch, dry_run, concourse_url, concourse_team, pipeline, job):
+@click.option('--version-file', help='Path to the file containing version information')
+@click.option(
+    '--version-pattern',
+    help='Regex pattern to extract version (with named capture group "version")',
+)
+def create_release(
+    type,
+    message,
+    branch,
+    dry_run,
+    concourse_url,
+    concourse_team,
+    pipeline,
+    job,
+    version_file,
+    version_pattern,
+):
     """Create a new release from the current branch."""
     if not check_git_repo():
         click.echo('Error: Current directory is not a git repository', err=True)
@@ -53,17 +70,44 @@ def create_release(type, message, branch, dry_run, concourse_url, concourse_team
                 sys.exit(0)
 
         # Determine current version
-        current_version = get_current_version(git_repo)
-        click.echo(f'Current version: {current_version}')
+        version_finder = VersionFinder(git_repo, version_file, version_pattern)
+        current_version, version_file_path, pattern_used = version_finder.get_current_version()
+
+        if current_version:
+            click.echo(f'Current version: {current_version}')
+            click.echo(f'Version found in: {version_file_path}')
+        else:
+            click.echo('No version information found in the repository.')
+            if click.confirm('Would you like to start with version 0.1.0?'):
+                current_version = '0.1.0'
+                if not version_file_path:
+                    # Prompt for version file if not found
+                    default_file = 'pyproject.toml'
+                    if os.path.exists(default_file):
+                        version_file_path = default_file
+                    else:
+                        version_file_path = click.prompt(
+                            'Enter the path to the file where version should be stored',
+                            default='__init__.py',
+                        )
+            else:
+                current_version = click.prompt('Enter the current version', default='0.1.0')
 
         # Calculate new version
         if current_version:
-            if type == 'major':
-                new_version = str(semver.VersionInfo.parse(current_version).bump_major())
-            elif type == 'minor':
-                new_version = str(semver.VersionInfo.parse(current_version).bump_minor())
-            else:  # patch
-                new_version = str(semver.VersionInfo.parse(current_version).bump_patch())
+            try:
+                if type == 'major':
+                    new_version = str(semver.VersionInfo.parse(current_version).bump_major())
+                elif type == 'minor':
+                    new_version = str(semver.VersionInfo.parse(current_version).bump_minor())
+                else:  # patch
+                    new_version = str(semver.VersionInfo.parse(current_version).bump_patch())
+            except ValueError:
+                click.echo(f'Warning: Version {current_version} is not a valid semver format.')
+                if click.confirm('Would you like to use 0.1.0 as a starting version?'):
+                    new_version = '0.1.0'
+                else:
+                    new_version = click.prompt('Enter the new version')
         else:
             # Default to 0.1.0 if no version found
             new_version = '0.1.0'
@@ -88,16 +132,23 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             click.echo('DRY RUN MODE - No changes will be made')
             click.echo(f'Would create release: {title}')
             click.echo(f'With message: {release_body}')
+            if version_file_path:
+                click.echo(f'Would update version in: {version_file_path}')
             return
 
-        # Update version in code
-        update_version_in_code(new_version)
+        # Update version in code if version file path was found
+        if version_file_path:
+            version_updater = VersionUpdater(
+                version_file_path, pattern_used, current_version, new_version
+            )
+            version_updater.update_version()
+            click.echo(f'Updated version in {version_file_path}')
 
-        # Commit changes
-        commit_message = f'Bump version to {new_version}'
-        click.echo(f'Committing version change: {commit_message}')
-        git_repo.git.add('src/voyager/__init__.py')
-        git_repo.git.commit('-m', commit_message)
+            # Commit changes
+            commit_message = f'Bump version to {new_version}'
+            click.echo(f'Committing version change: {commit_message}')
+            git_repo.git.add(version_file_path)
+            git_repo.git.commit('-m', commit_message)
 
         # Create tag
         tag_name = f'v{new_version}'
@@ -106,7 +157,7 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
         # Push changes and tag
         click.echo('Pushing changes and tag to remote...')
-        git_repo.git.push('origin', branch)
+        git_repo.git.push('origin', current_branch)
         git_repo.git.push('origin', tag_name)
 
         # Create GitHub release
@@ -151,44 +202,227 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         sys.exit(1)
 
 
-def get_current_version(git_repo):
-    """Get the current version from the package."""
-    try:
-        with open(os.path.join(git_repo.working_dir, 'src', 'voyager', '__init__.py'), 'r') as f:
-            content = f.read()
-            version_match = re.search(r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]', content)
-            if version_match:
-                return version_match.group(1)
+class VersionFinder:
+    """Helper class to find version information in different project structures."""
 
-        # Try to get the latest tag if no version in code
-        tags = sorted(git_repo.tags, key=lambda t: t.commit.committed_datetime)
-        if tags:
-            latest_tag = str(tags[-1])
-            if latest_tag.startswith('v'):
-                return latest_tag[1:]  # Remove 'v' prefix
+    def __init__(self, git_repo, version_file=None, version_pattern=None):
+        self.git_repo = git_repo
+        self.repo_root = git_repo.working_dir
+        self.custom_version_file = version_file
+        self.custom_version_pattern = version_pattern
+
+        # Default patterns for version detection
+        self.patterns = {
+            'python_init': r'__version__\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+            'pyproject_toml': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+            'package_json': r'"version"\s*:\s*"(?P<version>[^"]*)"',
+            'gradle': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+            'cargo_toml': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+            'gemspec': r'\.version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+            'version_txt': r'(?P<version>[\d\.]+)',
+        }
+
+    def get_current_version(self):
+        """Find the current version in the repository."""
+        # If a specific version file is provided, check it first
+        if self.custom_version_file:
+            version_file_path = os.path.join(self.repo_root, self.custom_version_file)
+            if os.path.exists(version_file_path):
+                pattern = self.custom_version_pattern or self._guess_pattern(version_file_path)
+                version = self._extract_version(version_file_path, pattern)
+                if version:
+                    return version, version_file_path, pattern
+
+        # Check common version file locations
+        version_locations = self._get_common_version_locations()
+
+        for file_path, pattern in version_locations:
+            full_path = os.path.join(self.repo_root, file_path)
+            if os.path.exists(full_path):
+                version = self._extract_version(full_path, pattern)
+                if version:
+                    return version, full_path, pattern
+
+        # Try to find the latest tag
+        try:
+            tags = sorted(self.git_repo.tags, key=lambda t: t.commit.committed_datetime)
+            if tags:
+                latest_tag = str(tags[-1])
+                if latest_tag.startswith('v'):
+                    return latest_tag[1:], None, None  # version from tag, no file
+                return latest_tag, None, None
+        except Exception:
+            pass
+
+        # If no version is found, return None
+        return None, None, None
+
+    def _get_common_version_locations(self):
+        """Return a list of tuples with (file_path, pattern) for common version file locations."""
+        locations = []
+
+        # Try to find the package name if it's a Python project
+        package_name = self._guess_package_name()
+
+        # Add common version file locations
+        if package_name:
+            locations.append((f'{package_name}/__init__.py', self.patterns['python_init']))
+
+        # Common version file locations by language/framework
+        common_locations = [
+            ('pyproject.toml', self.patterns['pyproject_toml']),
+            ('setup.py', r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]'),
+            ('package.json', self.patterns['package_json']),
+            ('VERSION', self.patterns['version_txt']),
+            ('version.txt', self.patterns['version_txt']),
+            ('build.gradle', self.patterns['gradle']),
+            ('build.gradle.kts', self.patterns['gradle']),
+            ('Cargo.toml', self.patterns['cargo_toml']),
+            ('*.gemspec', self.patterns['gemspec']),
+        ]
+
+        # Add all common locations
+        locations.extend(common_locations)
+
+        # Check for any __init__.py files in the root directories
+        for root, dirs, files in os.walk(self.repo_root):
+            if '__init__.py' in files and root != self.repo_root:
+                rel_path = os.path.relpath(os.path.join(root, '__init__.py'), self.repo_root)
+                locations.append((rel_path, self.patterns['python_init']))
+
+            # Only look at the top level directories
+            if root != self.repo_root:
+                dirs.clear()
+
+        return locations
+
+    def _guess_package_name(self):
+        """Try to guess the Python package name."""
+        # Check for standard Python project structure
+        setup_py = os.path.join(self.repo_root, 'setup.py')
+        if os.path.exists(setup_py):
+            try:
+                with open(setup_py, 'r') as f:
+                    content = f.read()
+                    name_match = re.search(r'name\s*=\s*[\'"]([^\'"]*)[\'"]', content)
+                    if name_match:
+                        return name_match.group(1)
+            except Exception:
+                pass
+
+        # Check pyproject.toml
+        pyproject_toml = os.path.join(self.repo_root, 'pyproject.toml')
+        if os.path.exists(pyproject_toml):
+            try:
+                with open(pyproject_toml, 'r') as f:
+                    content = f.read()
+                    name_match = re.search(r'name\s*=\s*[\'"]([^\'"]*)[\'"]', content)
+                    if name_match:
+                        return name_match.group(1)
+            except Exception:
+                pass
+
+        # Look for directories that might be Python packages
+        for item in os.listdir(self.repo_root):
+            if os.path.isdir(os.path.join(self.repo_root, item)):
+                if os.path.exists(os.path.join(self.repo_root, item, '__init__.py')):
+                    return item
 
         return None
-    except Exception as e:
-        click.echo(f'Warning: Could not determine current version: {str(e)}', err=True)
+
+    def _guess_pattern(self, file_path):
+        """Guess the version pattern based on the file extension."""
+        file_name = os.path.basename(file_path)
+        file_ext = os.path.splitext(file_name)[1].lower()
+
+        if file_name == 'pyproject.toml' or file_ext == '.toml':
+            return self.patterns['pyproject_toml']
+        elif file_name == 'package.json':
+            return self.patterns['package_json']
+        elif file_ext == '.py':
+            return self.patterns['python_init']
+        elif file_name in ('VERSION', 'version.txt') or file_ext == '.txt':
+            return self.patterns['version_txt']
+        elif file_ext == '.gradle' or file_ext == '.kts':
+            return self.patterns['gradle']
+        elif file_name == 'Cargo.toml':
+            return self.patterns['cargo_toml']
+        elif file_ext == '.gemspec':
+            return self.patterns['gemspec']
+
+        # Default to a generic pattern
+        return r'(?P<version>[\d\.]+)'
+
+    def _extract_version(self, file_path, pattern):
+        """Extract version from a file using the given pattern."""
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read()
+
+            # Use the provided pattern to find the version
+            match = re.search(pattern, content)
+            if match and 'version' in match.groupdict():
+                return match.group('version')
+        except Exception:
+            pass
+
         return None
 
 
-def update_version_in_code(new_version):
-    """Update the version in the package __init__.py file."""
-    try:
-        init_file = os.path.join('src', 'voyager', '__init__.py')
+class VersionUpdater:
+    """Helper class to update version information in different file formats."""
 
-        with open(init_file, 'r') as f:
-            content = f.read()
+    def __init__(self, file_path, pattern, old_version, new_version):
+        self.file_path = file_path
+        self.pattern = pattern
+        self.old_version = old_version
+        self.new_version = new_version
 
-        new_content = re.sub(
-            r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f"__version__ = '{new_version}'", content
+    def update_version(self):
+        """Update the version in the file."""
+        try:
+            # Read the file content
+            with open(self.file_path, 'r') as f:
+                content = f.read()
+
+            # Handle special cases based on file type
+            file_name = os.path.basename(self.file_path)
+            file_ext = os.path.splitext(file_name)[1].lower()
+
+            if file_name == 'pyproject.toml' or file_ext == '.toml':
+                new_content = self._update_toml(content)
+            elif file_name == 'package.json':
+                new_content = self._update_json(content)
+            elif file_ext == '.py':
+                new_content = self._update_generic(content)
+            else:
+                # Generic update using regex pattern
+                new_content = self._update_generic(content)
+
+            # Write the updated content back to the file
+            with open(self.file_path, 'w') as f:
+                f.write(new_content)
+
+            return True
+        except Exception as e:
+            raise Exception(f'Failed to update version in {self.file_path}: {str(e)}')
+
+    def _update_toml(self, content):
+        """Update version in TOML files with proper formatting."""
+        # For simplicity, use regex replacement but preserve formatting
+        return re.sub(
+            self.pattern, lambda m: m.group().replace(self.old_version, self.new_version), content
         )
 
-        with open(init_file, 'w') as f:
-            f.write(new_content)
+    def _update_json(self, content):
+        """Update version in JSON files with proper formatting."""
+        # For simplicity, use regex replacement but preserve formatting
+        return re.sub(
+            self.pattern, lambda m: m.group().replace(self.old_version, self.new_version), content
+        )
 
-        click.echo(f'Updated version in {init_file}')
-
-    except Exception as e:
-        raise Exception(f'Failed to update version in code: {str(e)}')
+    def _update_generic(self, content):
+        """Update version using a generic pattern replacement."""
+        return re.sub(
+            self.pattern, lambda m: m.group().replace(self.old_version, self.new_version), content
+        )

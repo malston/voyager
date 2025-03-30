@@ -1,10 +1,44 @@
 #!/usr/bin/env python3
 
 import os
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import click
 import requests
+import yaml
+
+
+def get_token_from_flyrc(team: str) -> Optional[str]:
+    """
+    Extract Concourse token for a specific team from ~/.flyrc file.
+
+    Args:
+        team: The Concourse team name
+
+    Returns:
+        The token string if found, None otherwise
+    """
+    flyrc_path = Path.home() / '.flyrc'
+    if not flyrc_path.exists():
+        return None
+    try:
+        with open(flyrc_path, 'r') as f:
+            flyrc_data = yaml.safe_load(f)
+
+        if not flyrc_data or 'targets' not in flyrc_data:
+            return None
+        # Look for the team in all targets
+        for _target, target_data in flyrc_data.get('targets', {}).items():
+            if target_data.get('team') == team:
+                token = target_data.get('token', {}).get('value')
+                if token:
+                    return token
+
+        return None
+    except (yaml.YAMLError, IOError) as e:
+        click.echo(f"Error reading flyrc file: {e}", err=True)
+        return None
 
 
 class ConcourseClient:
@@ -13,12 +47,20 @@ class ConcourseClient:
     def __init__(self, api_url: str, team: str, token: Optional[str] = None):
         self.api_url = api_url.rstrip('/')
         self.team = team
+
+        # Try to get token in priority order:
+        # 1. Explicitly provided token
+        # 2. CONCOURSE_TOKEN environment variable
+        # 3. Token from ~/.flyrc file for the specified team
         self.token = token or os.environ.get('CONCOURSE_TOKEN')
 
+        if not self.token and team:
+            self.token = get_token_from_flyrc(team)
         if not self.token:
             raise ValueError(
-                'Concourse token not found. Please set CONCOURSE_TOKEN environment variable or '
-                'provide it explicitly.'
+                'Concourse token not found. Please set CONCOURSE_TOKEN environment variable, '
+                'provide it explicitly, or ensure your ~/.flyrc file contains credentials '
+                f'for the team "{team}".'
             )
 
         self.headers = {'Authorization': f'Bearer {self.token}', 'Content-Type': 'application/json'}

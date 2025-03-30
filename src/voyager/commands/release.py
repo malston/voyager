@@ -37,6 +37,11 @@ from ..click_utils import CONTEXT_SETTINGS
     '--version-pattern',
     help='Regex pattern to extract version (with named capture group "version")',
 )
+@click.option(
+    '--version-branch',
+    default='version',
+    help='Branch to check for version information (defaults to "version")',
+)
 def create_release(
     type,
     message,
@@ -48,6 +53,7 @@ def create_release(
     job,
     version_file,
     version_pattern,
+    version_branch,
 ):
     """Create a new release from the current branch."""
     if not check_git_repo():
@@ -70,7 +76,7 @@ def create_release(
                 sys.exit(0)
 
         # Determine current version
-        version_finder = VersionFinder(git_repo, version_file, version_pattern)
+        version_finder = VersionFinder(git_repo, version_file, version_pattern, version_branch)
         current_version, version_file_path, pattern_used = version_finder.get_current_version()
 
         if current_version:
@@ -139,16 +145,25 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         # Update version in code if version file path was found
         if version_file_path:
             version_updater = VersionUpdater(
-                version_file_path, pattern_used, current_version, new_version
+                file_path=version_file_path,
+                pattern=pattern_used,
+                old_version=current_version,
+                new_version=new_version,
+                git_repo=git_repo,
+                branch=version_branch,
             )
-            version_updater.update_version()
+            # The update_version method will return True if it committed the changes
+            changes_committed = version_updater.update_version()
             click.echo(f'Updated version in {version_file_path}')
 
-            # Commit changes
-            commit_message = f'Bump version to {new_version}'
-            click.echo(f'Committing version change: {commit_message}')
-            git_repo.git.add(version_file_path)
-            git_repo.git.commit('-m', commit_message)
+            # Skip committing if the version updater already committed the changes
+            # (which happens when updating on a different branch)
+            if not changes_committed:
+                # Commit changes
+                commit_message = f'Bump version to {new_version}'
+                click.echo(f'Committing version change: {commit_message}')
+                git_repo.git.add(version_file_path)
+                git_repo.git.commit('-m', commit_message)
 
         # Create tag
         tag_name = f'v{new_version}'
@@ -205,11 +220,13 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 class VersionFinder:
     """Helper class to find version information in different project structures."""
 
-    def __init__(self, git_repo, version_file=None, version_pattern=None):
+    def __init__(self, git_repo, version_file=None, version_pattern=None, branch=None):
         self.git_repo = git_repo
         self.repo_root = git_repo.working_dir
         self.custom_version_file = version_file
         self.custom_version_pattern = version_pattern
+        self.branch = branch
+        self.original_branch = None
 
         # Default patterns for version detection
         self.patterns = {
@@ -222,40 +239,89 @@ class VersionFinder:
             'version_txt': r'(?P<version>[\d\.]+)',
         }
 
+    def checkout_branch(self):
+        """Checkout the target branch if specified."""
+        if self.branch:
+            try:
+                self.original_branch = self.git_repo.active_branch.name
+
+                # Check if the branch exists
+                branch_exists = False
+                for ref in self.git_repo.refs:
+                    if ref.name == self.branch or ref.name == f'origin/{self.branch}':
+                        branch_exists = True
+                        break
+
+                if not branch_exists:
+                    click.echo(
+                        f"Warning: Branch '{self.branch}' does not exist, staying on current branch."
+                    )
+                    return False
+
+                if self.original_branch != self.branch:
+                    click.echo(
+                        f"Checking out branch '{self.branch}' to find version information..."
+                    )
+                    self.git_repo.git.checkout(self.branch)
+                    return True
+            except Exception as e:
+                click.echo(f"Warning: Failed to checkout branch '{self.branch}': {str(e)}")
+                click.echo('Staying on current branch for version detection.')
+        return False
+
+    def restore_branch(self):
+        """Restore the original branch if we switched branches."""
+        if self.original_branch and self.original_branch != self.branch:
+            try:
+                click.echo(f"Restoring original branch '{self.original_branch}'...")
+                self.git_repo.git.checkout(self.original_branch)
+            except Exception as e:
+                click.echo(f'Warning: Failed to restore original branch: {str(e)}')
+
     def get_current_version(self):
         """Find the current version in the repository."""
-        # If a specific version file is provided, check it first
-        if self.custom_version_file:
-            version_file_path = os.path.join(self.repo_root, self.custom_version_file)
-            if os.path.exists(version_file_path):
-                pattern = self.custom_version_pattern or self._guess_pattern(version_file_path)
-                version = self._extract_version(version_file_path, pattern)
-                if version:
-                    return version, version_file_path, pattern
-
-        # Check common version file locations
-        version_locations = self._get_common_version_locations()
-
-        for file_path, pattern in version_locations:
-            full_path = os.path.join(self.repo_root, file_path)
-            if os.path.exists(full_path):
-                version = self._extract_version(full_path, pattern)
-                if version:
-                    return version, full_path, pattern
-
-        # Try to find the latest tag
+        switched_branch = False
         try:
-            tags = sorted(self.git_repo.tags, key=lambda t: t.commit.committed_datetime)
-            if tags:
-                latest_tag = str(tags[-1])
-                if latest_tag.startswith('v'):
-                    return latest_tag[1:], None, None  # version from tag, no file
-                return latest_tag, None, None
-        except Exception:
-            pass
+            # Switch to the specified branch if needed
+            switched_branch = self.checkout_branch()
 
-        # If no version is found, return None
-        return None, None, None
+            # If a specific version file is provided, check it first
+            if self.custom_version_file:
+                version_file_path = os.path.join(self.repo_root, self.custom_version_file)
+                if os.path.exists(version_file_path):
+                    pattern = self.custom_version_pattern or self._guess_pattern(version_file_path)
+                    version = self._extract_version(version_file_path, pattern)
+                    if version:
+                        return version, version_file_path, pattern
+
+            # Check common version file locations
+            version_locations = self._get_common_version_locations()
+
+            for file_path, pattern in version_locations:
+                full_path = os.path.join(self.repo_root, file_path)
+                if os.path.exists(full_path):
+                    version = self._extract_version(full_path, pattern)
+                    if version:
+                        return version, full_path, pattern
+
+            # Try to find the latest tag
+            try:
+                tags = sorted(self.git_repo.tags, key=lambda t: t.commit.committed_datetime)
+                if tags:
+                    latest_tag = str(tags[-1])
+                    if latest_tag.startswith('v'):
+                        return latest_tag[1:], None, None  # version from tag, no file
+                    return latest_tag, None, None
+            except Exception:
+                pass
+
+            # If no version is found, return None
+            return None, None, None
+
+        finally:
+            # Make sure we restore the original branch if we switched
+            if switched_branch:
+                self.restore_branch()
 
     def _get_common_version_locations(self):
         """Return a list of tuples with (file_path, pattern) for common version file locations."""
@@ -372,15 +438,62 @@ class VersionFinder:
 class VersionUpdater:
     """Helper class to update version information in different file formats."""
 
-    def __init__(self, file_path, pattern, old_version, new_version):
+    def __init__(self, file_path, pattern, old_version, new_version, git_repo=None, branch=None):
         self.file_path = file_path
         self.pattern = pattern
         self.old_version = old_version
         self.new_version = new_version
+        self.git_repo = git_repo
+        self.branch = branch
+        self.original_branch = None
+
+    def checkout_branch(self):
+        """Checkout the target branch if specified."""
+        if self.git_repo and self.branch:
+            try:
+                self.original_branch = self.git_repo.active_branch.name
+
+                # Check if the branch exists
+                branch_exists = False
+                for ref in self.git_repo.refs:
+                    if ref.name == self.branch or ref.name == f'origin/{self.branch}':
+                        branch_exists = True
+                        break
+
+                if not branch_exists:
+                    click.echo(
+                        f"Warning: Branch '{self.branch}' does not exist, staying on current branch."
+                    )
+                    return False
+
+                if self.original_branch != self.branch:
+                    click.echo(
+                        f"Checking out branch '{self.branch}' to update version information..."
+                    )
+                    self.git_repo.git.checkout(self.branch)
+                    return True
+            except Exception as e:
+                click.echo(f"Warning: Failed to checkout branch '{self.branch}': {str(e)}")
+                click.echo('Staying on current branch for version update.')
+        return False
+
+    def restore_branch(self):
+        """Restore the original branch if we switched branches."""
+        if self.git_repo and self.original_branch and self.original_branch != self.branch:
+            try:
+                click.echo(f"Restoring original branch '{self.original_branch}'...")
+                self.git_repo.git.checkout(self.original_branch)
+            except Exception as e:
+                click.echo(f'Warning: Failed to restore original branch: {str(e)}')
 
     def update_version(self):
         """Update the version in the file."""
+        switched_branch = False
+        changes_committed = False
         try:
+            # Switch to the specified branch if needed
+            switched_branch = self.checkout_branch()
+
             # Read the file content
             with open(self.file_path, 'r') as f:
                 content = f.read()
@@ -403,9 +516,33 @@ class VersionUpdater:
             with open(self.file_path, 'w') as f:
                 f.write(new_content)
 
-            return True
+            # If we're on a different branch, commit the changes before switching back
+            if switched_branch and self.git_repo:
+                try:
+                    # Commit the version change on the version branch
+                    commit_message = f'Bump version to {self.new_version}'
+                    click.echo(
+                        f'Committing version change on {self.branch} branch: {commit_message}'
+                    )
+                    self.git_repo.git.add(self.file_path)
+                    self.git_repo.git.commit('-m', commit_message)
+                    changes_committed = True
+
+                    # Push the change to remote if the user confirms
+                    if click.confirm(f"Push version change to remote '{self.branch}' branch?"):
+                        click.echo(f"Pushing changes to remote '{self.branch}' branch...")
+                        self.git_repo.git.push('origin', self.branch)
+                except Exception as e:
+                    click.echo(f'Warning: Failed to commit version change: {str(e)}')
+                    click.echo('You may need to manually commit and push the changes.')
+
+            return changes_committed
         except Exception as e:
             raise Exception(f'Failed to update version in {self.file_path}: {str(e)}')
+        finally:
+            # Make sure we restore the original branch if we switched
+            if switched_branch:
+                self.restore_branch()
 
     def _update_toml(self, content):
         """Update version in TOML files with proper formatting."""

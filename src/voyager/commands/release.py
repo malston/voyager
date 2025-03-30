@@ -92,12 +92,49 @@ def create_release(
 
         # Switch to the specified branch if we're not already on it
         if original_branch != branch:
-            click.echo(f"Switching to branch '{branch}' for release...")
+            # Offer merge strategy options
+            click.echo(f"Branch '{branch}' is different from your current branch '{original_branch}'.")
+            merge_strategy = click.prompt(
+                "Choose merge strategy",
+                type=click.Choice(['checkout', 'rebase', 'merge', 'merge-squash']),
+                default='checkout'
+            )
+            
             try:
-                git_repo.git.checkout(branch)
-                click.echo(f"Switched to branch '{branch}'")
+                if merge_strategy == 'checkout':
+                    # Simple checkout
+                    click.echo(f"Checking out branch '{branch}' for release...")
+                    git_repo.git.checkout(branch)
+                    click.echo(f"Switched to branch '{branch}'")
+                elif merge_strategy == 'rebase':
+                    # Rebase current branch onto target branch
+                    click.echo(f"Rebasing '{original_branch}' onto '{branch}'...")
+                    git_repo.git.checkout(branch)
+                    git_repo.git.checkout(original_branch)
+                    git_repo.git.rebase(branch)
+                    click.echo(f"Rebased '{original_branch}' onto '{branch}'")
+                elif merge_strategy == 'merge':
+                    # Merge target branch into current branch
+                    click.echo(f"Merging '{branch}' into '{original_branch}'...")
+                    git_repo.git.checkout(branch)
+                    git_repo.git.checkout(original_branch)
+                    git_repo.git.merge(branch, '--no-ff')
+                    click.echo(f"Merged '{branch}' into '{original_branch}'")
+                elif merge_strategy == 'merge-squash':
+                    # Squash merge target branch into current branch
+                    click.echo(f"Squash merging '{branch}' into '{original_branch}'...")
+                    git_repo.git.checkout(branch)
+                    git_repo.git.checkout(original_branch)
+                    git_repo.git.merge(branch, '--squash')
+                    commit_msg = f"Squashed merge of '{branch}' into '{original_branch}' for release"
+                    git_repo.git.commit('-m', commit_msg)
+                    click.echo(f"Squash merged '{branch}' into '{original_branch}'")
+                    
+                # Record the branch we're on after merge strategy
+                current_branch = git_repo.active_branch.name
+                click.echo(f"Proceeding with release from branch '{current_branch}'")
             except git.GitCommandError as e:
-                click.echo(f"Error switching to branch '{branch}': {str(e)}")
+                click.echo(f"Error with merge strategy '{merge_strategy}': {str(e)}")
                 if not click.confirm(f"Continue release from current branch '{original_branch}'?"):
                     click.echo('Release canceled.')
                     sys.exit(0)

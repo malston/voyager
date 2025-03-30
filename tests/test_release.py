@@ -85,8 +85,8 @@ def mock_env_setup():
         }
 
 
-def test_release_branch_switching(mock_env_setup):
-    """Test that the release command switches to the specified branch."""
+def test_release_branch_switching_checkout(mock_env_setup):
+    """Test release command with checkout strategy for a different branch."""
     runner = CliRunner()
     
     # Create a test environment
@@ -94,7 +94,9 @@ def test_release_branch_switching(mock_env_setup):
         # Mock click.confirm to always return True
         with patch('click.confirm', return_value=True):
             # Run the release command with a branch different from the current one
-            result = runner.invoke(create_release, ['--branch', 'develop', '--type', 'minor'])
+            # Provide 'checkout' as the merge strategy
+            result = runner.invoke(create_release, ['--branch', 'develop', '--type', 'minor'], 
+                                  input='checkout\n')
             
             # Check the command executed successfully
             assert result.exit_code == 0
@@ -103,8 +105,95 @@ def test_release_branch_switching(mock_env_setup):
             mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
             
             # Ensure the command output indicates a branch switch
-            assert "Switching to branch 'develop'" in result.output
+            assert "different from your current branch" in result.output
+            assert "Checking out branch 'develop'" in result.output
             assert "Switched to branch 'develop'" in result.output
+
+
+def test_release_branch_with_rebase(mock_env_setup):
+    """Test release command with rebase strategy for a different branch."""
+    runner = CliRunner()
+    
+    # Set up mock methods that may not exist yet
+    mock_env_setup['repo_instance'].git.rebase = MagicMock()
+    
+    # Create a test environment
+    with runner.isolated_filesystem():
+        # Run the release command with rebase strategy
+        result = runner.invoke(create_release, ['--branch', 'develop', '--type', 'minor'],
+                              input='rebase\n')
+        
+        # Check the command executed successfully
+        assert result.exit_code == 0
+        
+        # Verify git checkouts were called
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('main')
+        
+        # Check rebase was called
+        mock_env_setup['repo_instance'].git.rebase.assert_called_with('develop')
+        
+        # Verify output message contains rebase text
+        assert "Rebasing" in result.output
+
+
+def test_release_branch_with_merge(mock_env_setup):
+    """Test release command with merge strategy for a different branch."""
+    runner = CliRunner()
+    
+    # Set up mock methods that may not exist yet
+    mock_env_setup['repo_instance'].git.merge = MagicMock()
+    
+    # Create a test environment
+    with runner.isolated_filesystem():
+        # Run the release command with merge strategy
+        result = runner.invoke(create_release, ['--branch', 'develop', '--type', 'minor'],
+                              input='merge\n')
+        
+        # Check the command executed successfully
+        assert result.exit_code == 0
+        
+        # Verify git checkouts were called
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('main')
+        
+        # Check merge was called with --no-ff
+        mock_env_setup['repo_instance'].git.merge.assert_called_with('develop', '--no-ff')
+        
+        # Verify output message contains merge text
+        assert "Merging" in result.output
+
+
+def test_release_branch_with_squash_merge(mock_env_setup):
+    """Test release command with squash merge strategy for a different branch."""
+    runner = CliRunner()
+    
+    # Set up mock methods that may not exist yet
+    mock_env_setup['repo_instance'].git.merge = MagicMock()
+    
+    # Create a test environment
+    with runner.isolated_filesystem():
+        # Run the release command with squash merge strategy
+        result = runner.invoke(create_release, ['--branch', 'develop', '--type', 'minor'],
+                              input='merge-squash\n')
+        
+        # Check the command executed successfully
+        assert result.exit_code == 0
+        
+        # Verify git checkouts were called
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('main')
+        
+        # Check merge was called with --squash
+        mock_env_setup['repo_instance'].git.merge.assert_called_with('develop', '--squash')
+        
+        # Verify commit was called with appropriate message - using any_call because we have other commits
+        mock_env_setup['repo_instance'].git.commit.assert_any_call(
+            '-m', "Squashed merge of 'develop' into 'main' for release"
+        )
+        
+        # Verify output message contains squash text
+        assert "Squash" in result.output
 
 
 def test_release_nonexistent_branch(mock_env_setup):
@@ -178,17 +267,18 @@ def test_release_branch_restoration_on_success(mock_env_setup):
     github_client_instance.create_release.return_value = {'html_url': 'https://example.com/release'}
     
     with runner.isolated_filesystem():
-        # We need multiple confirmations: 
-        # - Once for tag confirmation 
-        # - Once for switching back to the original branch
+        # We need multiple confirmations and inputs:
+        # - Input for merge strategy
+        # - Confirmations for releases and branch switching
         with patch('click.confirm', side_effect=[True, True, True]):
-            # Run the release command - ignore exit code as the command has side effects that might trigger exits
-            result = runner.invoke(create_release, ['--branch', 'develop'], catch_exceptions=True)
+            # Run the release command with checkout strategy
+            result = runner.invoke(create_release, ['--branch', 'develop'], 
+                                 input='checkout\n', catch_exceptions=True)
             
             # Check for branch switching messages in the output
-            assert "Switching to branch 'develop'" in result.output
+            assert "Checking out branch 'develop'" in result.output
             
-            # Verify the first checkout call was to develop
+            # Verify the checkout call was to develop
             mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
 
 

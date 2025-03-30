@@ -21,8 +21,36 @@ from ..utils import check_git_repo, get_repo_info
 @click.option('--concourse-team', help='Concourse CI team name')
 @click.option('--pipeline', help='Concourse pipeline name to trigger')
 @click.option('--job', default='rollback', help='Concourse job name to trigger')
-def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
-    """Rollback to a previous release."""
+@click.option('--version-file', help='Path to the file containing version information')
+@click.option(
+    '--version-pattern',
+    help='Regex pattern to extract version (with named capture group "version")',
+)
+@click.option(
+    '--version-branch',
+    default='version',
+    help='Branch to check for version information (defaults to "version")',
+)
+def rollback(
+    tag,
+    dry_run,
+    concourse_url,
+    concourse_team,
+    pipeline,
+    job,
+    version_file,
+    version_pattern,
+    version_branch,
+):
+    """Rollback to a previous release.
+
+    This command creates a rollback branch from the specified tag, updates version
+    files (including those on separate branches if required), creates a new rollback tag,
+    and optionally creates a GitHub release and triggers a Concourse pipeline.
+
+    If --version-file is specified, that file will be updated with the rolled-back version.
+    If --version-branch is specified, the version file in that branch will be updated.
+    """
     if not check_git_repo():
         click.echo('Error: Current directory is not a git repository', err=True)
         sys.exit(1)
@@ -43,8 +71,8 @@ def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
             if github_authenticated:
                 releases = github_client.get_releases(owner, repo, per_page=20)
         except Exception as e:
-            click.echo(f"Warning: Unable to access GitHub API: {str(e)}", err=True)
-            click.echo("Continuing with local rollback only.")
+            click.echo(f'Warning: Unable to access GitHub API: {str(e)}', err=True)
+            click.echo('Continuing with local rollback only.')
             releases = []
             github_authenticated = False
 
@@ -69,8 +97,7 @@ def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
 
                 while True:
                     choice = click.prompt(
-                        'Enter the number of the release to roll back to',
-                        type=int
+                        'Enter the number of the release to roll back to', type=int
                     )
                     if 1 <= choice <= len(releases):
                         selected_release = releases[choice - 1]
@@ -141,13 +168,75 @@ def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
         # Create the new branch
         git_repo.git.checkout('-b', rollback_branch, tag)
 
-        # Update version in code
-        update_version_in_code(git_repo, version)
+        # Find and update version in code
+        # If a specific version file was provided, use it
+        version_file_path = None
+        pattern_used = None
+
+        if version_file:
+            version_file_path = os.path.join(git_repo.working_dir, version_file)
+            if os.path.exists(version_file_path):
+                click.echo(f'Using specified version file: {version_file_path}')
+                if version_pattern:
+                    pattern_used = version_pattern
+                else:
+                    pattern_used = guess_version_pattern(version_file_path)
+            else:
+                click.echo(f'Warning: Specified version file {version_file_path} not found')
+                version_file_path = None
+
+        # If no version file path found yet, check common locations
+        if not version_file_path:
+            # Try to find in common locations like __init__.py, pyproject.toml, etc.
+            version_file_path, pattern_used = find_version_file(git_repo.working_dir)
+
+        # Update the version
+        changes_committed = False
+        if version_file_path:
+            click.echo(f'Updating version in {version_file_path} to {version}')
+
+            # Get current version
+            current_version = extract_version(version_file_path, pattern_used)
+            if not current_version:
+                click.echo(f'Warning: Could not extract current version from {version_file_path}')
+                current_version = '0.0.0'  # Default if nothing found
+
+            # Create version updater
+            version_updater = VersionUpdater(
+                file_path=version_file_path,
+                pattern=pattern_used,
+                old_version=current_version,
+                new_version=version,
+                git_repo=git_repo,
+                branch=version_branch,
+            )
+
+            # Update the version (this will handle branch switching if needed)
+            changes_committed = version_updater.update_version()
+
+            # If the changes were not committed by the updater (if it wasn't on a different branch)
+            if not changes_committed:
+                click.echo(f'Updating version to {version} in rollback branch')
+                # Path might be different if we're not on the original branch
+                local_path = os.path.join(
+                    git_repo.working_dir, os.path.relpath(version_file_path, git_repo.working_dir)
+                )
+                git_repo.git.add(local_path)
+        else:
+            # Fallback to updating version in __init__.py
+            update_version_in_init(git_repo, version)
 
         # Commit changes
         commit_message = f'Rollback to {tag}'
         click.echo(f'Committing version change: {commit_message}')
-        git_repo.git.add('src/voyager/__init__.py')
+
+        # We don't always need to add __init__.py if we've updated a different file
+        # The version_updater would have already added changes if it was on a different branch
+        if not version_file_path and not changes_committed:
+            # Fall back to init.py if nothing else was found
+            git_repo.git.add('src/voyager/__init__.py')
+
+        # Commit all changes
         git_repo.git.commit('-m', commit_message)
 
         # Push the rollback branch
@@ -226,7 +315,108 @@ Rolled back on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         sys.exit(1)
 
 
-def update_version_in_code(git_repo, version):
+def find_version_file(repo_root):
+    """Find a file containing version information in common locations."""
+    # Define common patterns for different file types
+    patterns = {
+        'python_init': r'__version__\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'pyproject_toml': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'package_json': r'"version"\s*:\s*"(?P<version>[^"]*)"',
+        'gradle': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'cargo_toml': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'gemspec': r'\.version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'version_txt': r'(?P<version>[\d\.]+)',
+    }
+
+    # Check for common version files
+    common_files = [
+        ('pyproject.toml', patterns['pyproject_toml']),
+        ('package.json', patterns['package_json']),
+        ('setup.py', r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]'),
+        ('VERSION', patterns['version_txt']),
+        ('version.txt', patterns['version_txt']),
+        ('build.gradle', patterns['gradle']),
+        ('build.gradle.kts', patterns['gradle']),
+        ('Cargo.toml', patterns['cargo_toml']),
+    ]
+
+    # Check for __init__.py in src/package directories
+    for root, dirs, files in os.walk(repo_root):
+        if '__init__.py' in files:
+            rel_path = os.path.relpath(os.path.join(root, '__init__.py'), repo_root)
+            common_files.append((rel_path, patterns['python_init']))
+
+        # Limit to top-level directories to avoid deep search
+        if root != repo_root:
+            dirs.clear()
+
+    # Try each potential version file
+    for file_path, pattern in common_files:
+        full_path = os.path.join(repo_root, file_path)
+        if os.path.exists(full_path):
+            version = extract_version(full_path, pattern)
+            if version:
+                return full_path, pattern
+
+    # Default to the package __init__.py if it exists
+    default_init = os.path.join(repo_root, 'src', 'voyager', '__init__.py')
+    if os.path.exists(default_init):
+        return default_init, patterns['python_init']
+
+    return None, None
+
+
+def extract_version(file_path, pattern):
+    """Extract version from a file using the given pattern."""
+    try:
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        # Use the provided pattern to find the version
+        match = re.search(pattern, content)
+        if match and 'version' in match.groupdict():
+            return match.group('version')
+    except Exception:
+        pass
+
+    return None
+
+
+def guess_version_pattern(file_path):
+    """Guess the version pattern based on the file extension."""
+    file_name = os.path.basename(file_path)
+    file_ext = os.path.splitext(file_name)[1].lower()
+
+    patterns = {
+        'python_init': r'__version__\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'pyproject_toml': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'package_json': r'"version"\s*:\s*"(?P<version>[^"]*)"',
+        'gradle': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'cargo_toml': r'version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'gemspec': r'\.version\s*=\s*[\'"](?P<version>[^\'"]*)[\'"]',
+        'version_txt': r'(?P<version>[\d\.]+)',
+    }
+
+    if file_name == 'pyproject.toml' or file_ext == '.toml':
+        return patterns['pyproject_toml']
+    elif file_name == 'package.json':
+        return patterns['package_json']
+    elif file_ext == '.py':
+        return patterns['python_init']
+    elif file_name in ('VERSION', 'version.txt') or file_ext == '.txt':
+        return patterns['version_txt']
+    elif file_ext == '.gradle' or file_ext == '.kts':
+        return patterns['gradle']
+    elif file_name == 'Cargo.toml':
+        return patterns['cargo_toml']
+    elif file_ext == '.gemspec':
+        return patterns['gemspec']
+
+    # Default to a generic pattern
+    return r'(?P<version>[\d\.]+)'
+
+
+def update_version_in_init(git_repo, version):
     """Update the version in the package __init__.py file."""
     try:
         init_file = os.path.join(git_repo.working_dir, 'src', 'voyager', '__init__.py')
@@ -245,3 +435,134 @@ def update_version_in_code(git_repo, version):
 
     except Exception as e:
         raise Exception(f'Failed to update version in code: {str(e)}') from e
+
+
+class VersionUpdater:
+    """Helper class to update version information in different file formats."""
+
+    def __init__(self, file_path, pattern, old_version, new_version, git_repo=None, branch=None):
+        self.file_path = file_path
+        self.pattern = pattern
+        self.old_version = old_version
+        self.new_version = new_version
+        self.git_repo = git_repo
+        self.branch = branch
+        self.original_branch = None
+
+    def checkout_branch(self):
+        """Checkout the target branch if specified."""
+        if self.git_repo and self.branch:
+            try:
+                self.original_branch = self.git_repo.active_branch.name
+
+                # Check if the branch exists
+                branch_exists = False
+                for ref in self.git_repo.refs:
+                    if ref.name == self.branch or ref.name == f'origin/{self.branch}':
+                        branch_exists = True
+                        break
+
+                if not branch_exists:
+                    click.echo(
+                        f"Warning: Branch '{self.branch}' does not exist, "
+                        f'staying on current branch.'
+                    )
+                    return False
+
+                if self.original_branch != self.branch:
+                    click.echo(
+                        f"Checking out branch '{self.branch}' to update version information..."
+                    )
+                    self.git_repo.git.checkout(self.branch)
+                    return True
+            except Exception as e:
+                click.echo(f"Warning: Failed to checkout branch '{self.branch}': {str(e)}")
+                click.echo('Staying on current branch for version update.')
+        return False
+
+    def restore_branch(self):
+        """Restore the original branch if we switched branches."""
+        if self.git_repo and self.original_branch and self.original_branch != self.branch:
+            try:
+                click.echo(f"Restoring original branch '{self.original_branch}'...")
+                self.git_repo.git.checkout(self.original_branch)
+            except Exception as e:
+                click.echo(f'Warning: Failed to restore original branch: {str(e)}')
+
+    def update_version(self):
+        """Update the version in the file."""
+        switched_branch = False
+        changes_committed = False
+        try:
+            # Switch to the specified branch if needed
+            switched_branch = self.checkout_branch()
+
+            # Read the file content
+            with open(self.file_path, 'r') as f:
+                content = f.read()
+
+            # Handle special cases based on file type
+            file_name = os.path.basename(self.file_path)
+            file_ext = os.path.splitext(file_name)[1].lower()
+
+            if file_name == 'pyproject.toml' or file_ext == '.toml':
+                new_content = self._update_toml(content)
+            elif file_name == 'package.json':
+                new_content = self._update_json(content)
+            elif file_ext == '.py':
+                new_content = self._update_generic(content)
+            else:
+                # Generic update using regex pattern
+                new_content = self._update_generic(content)
+
+            # Write the updated content back to the file
+            with open(self.file_path, 'w') as f:
+                f.write(new_content)
+
+            # If we're on a different branch, commit the changes before switching back
+            if switched_branch and self.git_repo:
+                try:
+                    # Commit the version change on the version branch
+                    commit_message = f'Update version to {self.new_version} for rollback'
+                    click.echo(
+                        f'Committing version change on {self.branch} branch: {commit_message}'
+                    )
+                    self.git_repo.git.add(self.file_path)
+                    self.git_repo.git.commit('-m', commit_message)
+                    changes_committed = True
+
+                    # Push the change to remote if the user confirms
+                    if click.confirm(f"Push version change to remote '{self.branch}' branch?"):
+                        click.echo(f"Pushing changes to remote '{self.branch}' branch...")
+                        self.git_repo.git.push('origin', self.branch)
+                except Exception as e:
+                    click.echo(f'Warning: Failed to commit version change: {str(e)}')
+                    click.echo('You may need to manually commit and push the changes.')
+
+            return changes_committed
+        except Exception as e:
+            raise Exception(f'Failed to update version in {self.file_path}: {str(e)}') from e
+        finally:
+            # Make sure we restore the original branch if we switched
+            if switched_branch:
+                self.restore_branch()
+
+    def _update_toml(self, content):
+        """Update version in TOML files with proper formatting."""
+        # For simplicity, use regex replacement but preserve formatting
+        return re.sub(
+            self.pattern, lambda m: m.group().replace(self.old_version, self.new_version), content
+        )
+
+    def _update_json(self, content):
+        """Update version in JSON files with proper formatting."""
+        # For simplicity, use regex replacement but preserve formatting
+        return re.sub(
+            self.pattern, lambda m: m.group().replace(self.old_version, self.new_version), content
+        )
+
+    def _update_generic(self, content):
+        """Update version using a generic pattern replacement."""
+        return re.sub(
+            self.pattern, lambda m: m.group().replace(self.old_version, self.new_version), content
+        )

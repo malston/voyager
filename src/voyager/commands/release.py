@@ -255,7 +255,7 @@ class VersionFinder:
                 if not branch_exists:
                     click.echo(
                         f"Warning: Branch '{self.branch}' does not exist, "
-                        f"staying on current branch."
+                        f'staying on current branch.'
                     )
                     return False
 
@@ -464,7 +464,7 @@ class VersionUpdater:
                 if not branch_exists:
                     click.echo(
                         f"Warning: Branch '{self.branch}' does not exist, "
-                        f"staying on current branch."
+                        f'staying on current branch.'
                     )
                     return False
 

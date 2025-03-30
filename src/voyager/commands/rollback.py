@@ -31,40 +31,75 @@ def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
         owner, repo = get_repo_info()
         git_repo = git.Repo(os.getcwd())
 
-        # Fetch releases to display options
-        github_client = GitHubClient()
-        releases = github_client.get_releases(owner, repo, per_page=20)
+        # Check for GitHub authentication - make it optional
+        github_authenticated = False
+        try:
+            # Create GitHub client with authentication required=False
+            github_client = GitHubClient(required=False)
+            github_authenticated = github_client.is_authenticated
 
-        if not releases:
-            click.echo('No releases found to roll back to.')
-            sys.exit(1)
+            # Only fetch releases if we're authenticated
+            releases = []
+            if github_authenticated:
+                releases = github_client.get_releases(owner, repo, per_page=20)
+        except Exception as e:
+            click.echo(f"Warning: Unable to access GitHub API: {str(e)}", err=True)
+            click.echo("Continuing with local rollback only.")
+            releases = []
+            github_authenticated = False
 
-        # If tag is not specified, ask the user to select a release
+        # If tag is not specified, we'll need to provide options
         if not tag:
-            click.echo('Available releases for rollback:')
+            # If authenticated with GitHub, use releases list
+            if releases:
+                click.echo('Available releases for rollback:')
 
-            for idx, release in enumerate(releases, 1):
-                published_at = release.get('published_at', 'N/A')
-                if published_at != 'N/A':
-                    date_obj = datetime.strptime(published_at, '%Y-%m-%dT%H:%M:%SZ')
-                    formatted_date = date_obj.strftime('%Y-%m-%d %H:%M')
-                else:
-                    formatted_date = 'N/A'
+                for idx, release in enumerate(releases, 1):
+                    published_at = release.get('published_at', 'N/A')
+                    if published_at != 'N/A':
+                        date_obj = datetime.strptime(published_at, '%Y-%m-%dT%H:%M:%SZ')
+                        formatted_date = date_obj.strftime('%Y-%m-%d %H:%M')
+                    else:
+                        formatted_date = 'N/A'
 
-                click.echo(
-                    f'{idx}. {release.get("tag_name")} - {release.get("name")} ({formatted_date})'
-                )
-
-            while True:
-                choice = click.prompt('Enter the number of the release to roll back to', type=int)
-                if 1 <= choice <= len(releases):
-                    selected_release = releases[choice - 1]
-                    tag = selected_release.get('tag_name')
-                    break
-                else:
                     click.echo(
-                        f'Invalid choice. Please enter a number between 1 and {len(releases)}'
+                        f'{idx}. {release.get("tag_name")} - '
+                        f'{release.get("name")} ({formatted_date})'
                     )
+
+                while True:
+                    choice = click.prompt(
+                        'Enter the number of the release to roll back to',
+                        type=int
+                    )
+                    if 1 <= choice <= len(releases):
+                        selected_release = releases[choice - 1]
+                        tag = selected_release.get('tag_name')
+                        break
+                    else:
+                        click.echo(
+                            f'Invalid choice. Please enter a number between 1 and {len(releases)}'
+                        )
+            else:
+                # Not authenticated or no releases found, list local tags instead
+                tags = sorted([t.name for t in git_repo.tags], reverse=True)
+                if not tags:
+                    click.echo('No tags found in the repository for rollback.')
+                    sys.exit(1)
+
+                click.echo('Available tags for rollback:')
+                for idx, t in enumerate(tags, 1):
+                    click.echo(f'{idx}. {t}')
+
+                while True:
+                    choice = click.prompt('Enter the number of the tag to roll back to', type=int)
+                    if 1 <= choice <= len(tags):
+                        tag = tags[choice - 1]
+                        break
+                    else:
+                        click.echo(
+                            f'Invalid choice. Please enter a number between 1 and {len(tags)}'
+                        )
 
         # Validate the tag exists
         try:
@@ -125,24 +160,34 @@ def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
         git_repo.create_tag(rollback_tag)
         git_repo.git.push('origin', rollback_tag)
 
-        # Create GitHub release for the rollback
-        click.echo('Creating GitHub release for rollback...')
-        rollback_message = f"""
+        # Create GitHub release for the rollback (if authenticated)
+        if github_authenticated:
+            click.echo('Creating GitHub release for rollback...')
+            rollback_message = f"""
 # Rollback to {tag}
 
 This is a rollback to the previous release {tag}.
 
 Rolled back on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
-        rollback_release = github_client.create_release(
-            owner=owner,
-            repo=repo,
-            tag_name=rollback_tag,
-            name=f'Rollback to {tag}',
-            body=rollback_message,
-        )
-
-        click.echo(f'✓ GitHub rollback release created: {rollback_release.get("html_url")}')
+            try:
+                rollback_release = github_client.create_release(
+                    owner=owner,
+                    repo=repo,
+                    tag_name=rollback_tag,
+                    name=f'Rollback to {tag}',
+                    body=rollback_message,
+                )
+                click.echo(f'✓ GitHub rollback release created: {rollback_release.get("html_url")}')
+            except Exception as e:
+                click.echo(f'Warning: Could not create GitHub release: {str(e)}', err=True)
+                click.echo('Continuing with local rollback only.')
+        else:
+            click.echo('Skipping GitHub release creation (not authenticated).')
+            click.echo(
+                'To create a GitHub release later, set GITHUB_TOKEN and use the GitHub '
+                'web interface.'
+            )
 
         # Trigger Concourse pipeline if requested
         if concourse_url and concourse_team and pipeline:

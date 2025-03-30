@@ -9,19 +9,22 @@ import requests
 class GitHubClient:
     """Client for interacting with GitHub API."""
 
-    def __init__(self, token: Optional[str] = None):
+    def __init__(self, token: Optional[str] = None, required: bool = True):
         self.token = token or os.environ.get('GITHUB_TOKEN')
+        self.is_authenticated = bool(self.token)
 
-        if not self.token:
+        if not self.token and required:
             raise ValueError(
                 'GitHub token not found. Please set GITHUB_TOKEN environment variable or '
                 'provide it explicitly.'
             )
 
         self.headers = {
-            'Authorization': f'token {self.token}',
             'Accept': 'application/vnd.github.v3+json',
         }
+
+        if self.token:
+            self.headers['Authorization'] = f'token {self.token}'
 
     def create_release(
         self,

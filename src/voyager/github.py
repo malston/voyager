@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 import os
-import requests
 from typing import Dict, List, Optional
+
+import requests
 
 
 class GitHubClient:
@@ -13,7 +14,8 @@ class GitHubClient:
 
         if not self.token:
             raise ValueError(
-                'GitHub token not found. Please set GITHUB_TOKEN environment variable or provide it explicitly.'
+                'GitHub token not found. Please set GITHUB_TOKEN environment variable or '
+                'provide it explicitly.'
             )
 
         self.headers = {

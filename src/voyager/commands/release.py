@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import re
+import sys
+from datetime import datetime
+
 import click
 import git
 import semver
-from pathlib import Path
-from datetime import datetime
 
-from ..github import GitHubClient
-from ..concourse import ConcourseClient
-from ..utils import check_git_repo, get_repo_info
 from ..click_utils import CONTEXT_SETTINGS
+from ..concourse import ConcourseClient
+from ..github import GitHubClient
+from ..utils import check_git_repo, get_repo_info
 
 
 @click.command('release', context_settings=CONTEXT_SETTINGS)
@@ -254,7 +254,8 @@ class VersionFinder:
 
                 if not branch_exists:
                     click.echo(
-                        f"Warning: Branch '{self.branch}' does not exist, staying on current branch."
+                        f"Warning: Branch '{self.branch}' does not exist, "
+                        f"staying on current branch."
                     )
                     return False
 
@@ -462,7 +463,8 @@ class VersionUpdater:
 
                 if not branch_exists:
                     click.echo(
-                        f"Warning: Branch '{self.branch}' does not exist, staying on current branch."
+                        f"Warning: Branch '{self.branch}' does not exist, "
+                        f"staying on current branch."
                     )
                     return False
 
@@ -538,7 +540,7 @@ class VersionUpdater:
 
             return changes_committed
         except Exception as e:
-            raise Exception(f'Failed to update version in {self.file_path}: {str(e)}')
+            raise Exception(f'Failed to update version in {self.file_path}: {str(e)}') from e
         finally:
             # Make sure we restore the original branch if we switched
             if switched_branch:

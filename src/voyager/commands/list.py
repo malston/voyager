@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 import sys
-import click
 from datetime import datetime
+
+import click
 from tabulate import tabulate
 
+from ..click_utils import CONTEXT_SETTINGS
 from ..github import GitHubClient
 from ..utils import check_git_repo, get_repo_info
-from ..click_utils import CONTEXT_SETTINGS
 
 
 @click.command('list', context_settings=CONTEXT_SETTINGS)

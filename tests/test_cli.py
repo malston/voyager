@@ -1,4 +1,3 @@
-import pytest
 from voyager import cli
 
 

@@ -2,8 +2,9 @@
 
 import os
 import re
-import git
 from typing import Tuple
+
+import git
 
 
 def get_repo_info() -> Tuple[str, str]:
@@ -19,8 +20,8 @@ def get_repo_info() -> Tuple[str, str]:
                     return match.group(1), match.group(2)
 
         raise ValueError('Not a GitHub repository or missing origin remote')
-    except (git.InvalidGitRepositoryError, git.NoSuchPathError):
-        raise ValueError('Current directory is not a git repository')
+    except (git.InvalidGitRepositoryError, git.NoSuchPathError) as err:
+        raise ValueError('Current directory is not a git repository') from err
 
 
 def check_git_repo() -> bool:

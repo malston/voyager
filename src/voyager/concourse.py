@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import os
-import requests
-import click
 from typing import Dict, List, Optional
+
+import click
+import requests
 
 
 class ConcourseClient:
@@ -16,7 +17,8 @@ class ConcourseClient:
 
         if not self.token:
             raise ValueError(
-                'Concourse token not found. Please set CONCOURSE_TOKEN environment variable or provide it explicitly.'
+                'Concourse token not found. Please set CONCOURSE_TOKEN environment variable or '
+                'provide it explicitly.'
             )
 
         self.headers = {'Authorization': f'Bearer {self.token}', 'Content-Type': 'application/json'}
@@ -25,7 +27,10 @@ class ConcourseClient:
         self, pipeline_name: str, job_name: str, variables: Dict[str, str] = None
     ) -> bool:
         """Trigger a job in a Concourse pipeline with optional variables."""
-        url = f'{self.api_url}/api/v1/teams/{self.team}/pipelines/{pipeline_name}/jobs/{job_name}/builds'
+        url = (
+            f'{self.api_url}/api/v1/teams/{self.team}/pipelines/{pipeline_name}/'
+            f'jobs/{job_name}/builds'
+        )
 
         payload = {}
         if variables:
@@ -37,7 +42,8 @@ class ConcourseClient:
             build_data = response.json()
             click.echo(f'Pipeline triggered: Build #{build_data.get("id", "Unknown")}')
             click.echo(
-                f'URL: {self.api_url}/teams/{self.team}/pipelines/{pipeline_name}/jobs/{job_name}/builds/{build_data.get("name", "latest")}'
+                f'URL: {self.api_url}/teams/{self.team}/pipelines/{pipeline_name}/jobs/{job_name}/'
+                f'builds/{build_data.get("name", "latest")}'
             )
             return True
         else:

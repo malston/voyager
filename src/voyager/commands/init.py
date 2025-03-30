@@ -2,14 +2,13 @@
 
 import os
 import sys
-import click
 from pathlib import Path
-import yaml
-import shutil
-import git
 
-from ..utils import check_git_repo, get_repo_info
+import click
+import yaml
+
 from ..click_utils import CONTEXT_SETTINGS
+from ..utils import check_git_repo, get_repo_info
 
 
 @click.command('init', context_settings=CONTEXT_SETTINGS)
@@ -80,7 +79,8 @@ def init_repo(concourse_url, concourse_team, pipeline):
             if not os.environ.get('CONCOURSE_TOKEN'):
                 click.echo('Warning: CONCOURSE_TOKEN environment variable is not set.')
                 click.echo(
-                    'You will need to set this before using Voyager commands that interact with Concourse CI.'
+                    'You will need to set this before using Voyager commands '
+                    'that interact with Concourse CI.'
                 )
 
         # Create .env.example file
@@ -144,21 +144,17 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-      
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install build twine
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      
       - name: Build package
         run: python -m build
-      
       - name: Publish to PyPI
         if: startsWith(github.ref, 'refs/tags/v')
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -185,7 +181,6 @@ resources:
     source:
       uri: https://github.com/{owner}/{repo}.git
       branch: main
-      
   - name: github-release
     type: github-release
     source:
@@ -198,7 +193,6 @@ jobs:
     plan:
       - get: source-code
         trigger: false
-      
       - task: build
         config:
           platform: linux
@@ -221,7 +215,6 @@ jobs:
                 pip install -e .
                 python setup.py sdist bdist_wheel
                 cp dist/* ../built-release/
-      
       - put: github-release
         params:
           name: v((version))
@@ -232,7 +225,6 @@ jobs:
     plan:
       - get: source-code
         passed: [build-and-release]
-      
       - task: prepare-rollback
         config:
           platform: linux

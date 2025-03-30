@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
 import os
-import sys
-import click
-import git
 import re
+import sys
 from datetime import datetime
 
-from ..github import GitHubClient
-from ..concourse import ConcourseClient
-from ..utils import check_git_repo, get_repo_info
+import click
+import git
+
 from ..click_utils import CONTEXT_SETTINGS
+from ..concourse import ConcourseClient
+from ..github import GitHubClient
+from ..utils import check_git_repo, get_repo_info
 
 
 @click.command('rollback', context_settings=CONTEXT_SETTINGS)
@@ -67,7 +68,8 @@ def rollback(tag, dry_run, concourse_url, concourse_team, pipeline, job):
 
         # Validate the tag exists
         try:
-            tag_commit = git_repo.tags[tag].commit
+            # Verify tag exists
+            git_repo.tags[tag]
         except (IndexError, ValueError):
             click.echo(f"Error: Tag '{tag}' does not exist in the repository")
             sys.exit(1)
@@ -167,11 +169,12 @@ Rolled back on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         # Advice on how to proceed
         click.echo('\nRollback branch created successfully.')
         click.echo(
-            f"If you want to complete the rollback, merge the '{rollback_branch}' branch to your main branch:"
+            f"If you want to complete the rollback, merge the '{rollback_branch}' "
+            f'branch to your main branch:'
         )
-        click.echo(f'  git checkout main')
+        click.echo('  git checkout main')
         click.echo(f'  git merge {rollback_branch}')
-        click.echo(f'  git push origin main')
+        click.echo('  git push origin main')
 
     except Exception as e:
         click.echo(f'Error during rollback: {str(e)}', err=True)
@@ -196,4 +199,4 @@ def update_version_in_code(git_repo, version):
         click.echo(f'Updated version in {init_file}')
 
     except Exception as e:
-        raise Exception(f'Failed to update version in code: {str(e)}')
+        raise Exception(f'Failed to update version in code: {str(e)}') from e

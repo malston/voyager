@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 import sys
-import click
 from datetime import datetime
+
+import click
 from tabulate import tabulate
 
+from ..click_utils import CONTEXT_SETTINGS
 from ..concourse import ConcourseClient
 from ..utils import check_git_repo, get_repo_info
-from ..click_utils import CONTEXT_SETTINGS
 
 
 @click.command('pipelines', context_settings=CONTEXT_SETTINGS)
@@ -103,7 +104,10 @@ def list_pipelines(limit, concourse_url, concourse_team, pipeline, format):
                     status_display = status
 
                 # Build URL
-                url = f'{concourse_url}/teams/{concourse_team}/pipelines/{pipeline}/jobs/{build.get("job_name")}/builds/{build.get("name")}'
+                url = (
+                    f'{concourse_url}/teams/{concourse_team}/pipelines/{pipeline}/jobs/'
+                    f'{build.get("job_name")}/builds/{build.get("name")}'
+                )
 
                 # Add the row
                 table_data.append(

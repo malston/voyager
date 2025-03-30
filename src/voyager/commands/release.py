@@ -14,8 +14,28 @@ from ..concourse import ConcourseClient
 from ..github import GitHubClient
 from ..utils import check_git_repo, get_repo_info
 
+# Simplified help text
+MERGE_STRATEGY_DESCRIPTIONS = {
+    'rebase': 'Apply source branch commits on top of target branch [default]',
+    'merge': 'Create merge commit to bring source changes into target',
+    'squash': 'Squash all source changes into a single commit on target',
+    'checkout': 'Switch to target branch (abandons working branch changes)',
+}
 
-@click.command('release', context_settings=CONTEXT_SETTINGS)
+
+class CustomCommand(click.Command):
+    """Custom command that adds detailed merge strategy help."""
+
+    def format_help(self, ctx, formatter):
+        """Add custom formatting for merge strategy help."""
+        super().format_help(ctx, formatter)
+
+        formatter.write('\n\nMerge strategies:\n')
+        for strategy, desc in MERGE_STRATEGY_DESCRIPTIONS.items():
+            formatter.write(f'  {strategy:<10} - {desc}\n')
+
+
+@click.command('release', context_settings=CONTEXT_SETTINGS, cls=CustomCommand)
 @click.option(
     '-t',
     '--type',
@@ -54,20 +74,15 @@ from ..utils import check_git_repo, get_repo_info
 @click.option(
     '--version-branch',
     default='version',
-    help='Branch to check for version information (defaults to "version")',
+    help='Branch to check for version information',
 )
 @click.option(
     '--merge-strategy',
     '-s',
-    type=click.Choice(['checkout', 'rebase', 'merge', 'merge-squash']),
+    type=click.Choice(['rebase', 'merge', 'squash', 'checkout']),
     default='rebase',
-    help="""Strategy to use when target and source branches differ:
-
-  checkout     - Switch to target branch (abandons working branch changes)
-  rebase       - Default. Apply source branch commits on top of target branch
-  merge        - Create merge commit to bring source changes into target
-  merge-squash - Squash all source changes into a single commit on target
-""",
+    show_default=False,
+    help='Strategy to use when target and source branches differ',
 )
 @click.pass_context
 def create_release(
@@ -164,7 +179,7 @@ def create_release(
             if not merge_strategy:
                 merge_strategy = click.prompt(
                     'Choose merge strategy',
-                    type=click.Choice(['checkout', 'rebase', 'merge', 'merge-squash']),
+                    type=click.Choice(['checkout', 'rebase', 'merge', 'squash']),
                     default='rebase',
                 )
             else:
@@ -276,7 +291,7 @@ def create_release(
                     git_repo.git.branch('-D', backup_branch)
                     click.echo(f"Removed backup branch '{backup_branch}'")
 
-                elif merge_strategy == 'merge-squash':
+                elif merge_strategy == 'squash':
                     # Squash merge changes from working branch into the target branch
                     click.echo(
                         f"Squash merging changes from '{working_branch}' into '{release_branch}'..."
@@ -454,9 +469,7 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
             try:
                 concourse_client = ConcourseClient(
-                    api_url=concourse_url,
-                    team=concourse_team,
-                    target=concourse_target
+                    api_url=concourse_url, team=concourse_team, target=concourse_target
                 )
 
                 variables = {'version': new_version, 'is_rollback': 'false'}

@@ -12,10 +12,11 @@ from ..utils import check_git_repo, get_repo_info
 
 
 @click.command('init', context_settings=CONTEXT_SETTINGS)
-@click.option('--concourse-url', help='Concourse CI API URL')
-@click.option('--concourse-team', help='Concourse CI team name')
-@click.option('--pipeline', help='Concourse pipeline name')
-def init_repo(concourse_url, concourse_team, pipeline):
+@click.option('--concourse-url', metavar='URL', help='Concourse CI API URL')
+@click.option('--concourse-team', metavar='TEAM', help='Concourse CI team name')
+@click.option('--pipeline', metavar='NAME', help='Concourse pipeline name')
+@click.pass_context
+def init_repo(ctx, concourse_url, concourse_team, pipeline):
     """Initialize the current repository for Voyager."""
     if not check_git_repo():
         click.echo('Error: Current directory is not a git repository', err=True)
@@ -23,7 +24,9 @@ def init_repo(concourse_url, concourse_team, pipeline):
 
     try:
         owner, repo = get_repo_info()
-        click.echo(f'Initializing Voyager for {owner}/{repo}...')
+        quiet = ctx.obj.get('quiet', False) if ctx.obj else False
+        if not quiet:
+            click.echo(f'Initializing Voyager for {owner}/{repo}...')
 
         # Create .github directory if it doesn't exist
         github_dir = Path('.github')

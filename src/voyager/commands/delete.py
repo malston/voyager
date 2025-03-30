@@ -12,9 +12,10 @@ from ..utils import check_git_repo, get_repo_info
 
 
 @click.command('delete', context_settings=CONTEXT_SETTINGS)
-@click.option('--tag', '-t', help='Specific tag to delete')
-@click.option('--force', '-f', is_flag=True, help='Force deletion without confirmation')
-def delete_release(tag, force):
+@click.option('-t', '--tag', metavar='TAG', help='Specific tag to delete')
+@click.option('-f', '--force', is_flag=True, help='Force deletion without confirmation')
+@click.pass_context
+def delete_release(ctx, tag, force):
     """Delete a release and its tag."""
     if not check_git_repo():
         click.echo('Error: Current directory is not a git repository', err=True)

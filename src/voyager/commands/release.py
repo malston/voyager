@@ -17,18 +17,17 @@ from ..utils import check_git_repo, get_repo_info
 
 @click.command('release', context_settings=CONTEXT_SETTINGS)
 @click.option(
-    '--type',
-    '-t',
+    '-t', '--type',
     type=click.Choice(['major', 'minor', 'patch']),
     default='patch',
     help='Release type (major, minor, patch)',
 )
-@click.option('--message', '-m', help='Release message')
+@click.option('-m', '--message', metavar='MSG', help='Release message')
 @click.option(
-    '--branch', '-b', default='main', help='Branch to switch to and release from (defaults to main)'
+    '-b', '--branch', default='main', metavar='BRANCH', help='Branch to switch to and release from'
 )
 @click.option(
-    '--dry-run', '-d', is_flag=True, help='Perform a dry run without creating actual release'
+    '-d', '--dry-run', is_flag=True, help='Perform a dry run without creating actual release'
 )
 @click.option('--concourse-url', help='Concourse CI API URL')
 @click.option('--concourse-team', help='Concourse CI team name')
@@ -44,7 +43,9 @@ from ..utils import check_git_repo, get_repo_info
     default='version',
     help='Branch to check for version information (defaults to "version")',
 )
+@click.pass_context
 def create_release(
+    ctx,
     type,
     message,
     branch,
@@ -64,7 +65,9 @@ def create_release(
 
     try:
         owner, repo = get_repo_info()
-        click.echo(f'Preparing release for {owner}/{repo}...')
+        quiet = ctx.obj.get('quiet', False) if ctx.obj else False
+        if not quiet:
+            click.echo(f'Preparing release for {owner}/{repo}...')
 
         # Get the git repo
         git_repo = git.Repo(os.getcwd())

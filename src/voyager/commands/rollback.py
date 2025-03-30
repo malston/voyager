@@ -15,8 +15,8 @@ from ..utils import check_git_repo, get_repo_info
 
 
 @click.command('rollback', context_settings=CONTEXT_SETTINGS)
-@click.option('--tag', '-t', help='Specific tag to rollback to')
-@click.option('--dry-run', '-d', is_flag=True, help='Perform a dry run without actual rollback')
+@click.option('-t', '--tag', metavar='TAG', help='Specific tag to rollback to')
+@click.option('-d', '--dry-run', is_flag=True, help='Perform a dry run without actual rollback')
 @click.option('--concourse-url', help='Concourse CI API URL')
 @click.option('--concourse-team', help='Concourse CI team name')
 @click.option('--pipeline', help='Concourse pipeline name to trigger')
@@ -31,7 +31,9 @@ from ..utils import check_git_repo, get_repo_info
     default='version',
     help='Branch to check for version information (defaults to "version")',
 )
+@click.pass_context
 def rollback(
+    ctx,
     tag,
     dry_run,
     concourse_url,

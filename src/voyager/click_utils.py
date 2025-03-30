@@ -9,5 +9,5 @@ CONTEXT_SETTINGS = dict(
     max_content_width=80,
     auto_envvar_prefix='VOYAGER',
     show_default=True,
-    terminal_width=80
+    terminal_width=80,
 )

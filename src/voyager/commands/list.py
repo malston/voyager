@@ -19,7 +19,9 @@ def list_group():
 
 
 @list_group.command('releases')
-@click.option('-n', '--limit', type=int, default=10, metavar='N', help='Limit the number of releases shown')
+@click.option(
+    '-n', '--limit', type=int, default=10, metavar='N', help='Limit the number of releases shown'
+)
 @click.option(
     '-o', '--output', type=click.Choice(['table', 'json']), default='table', help='Output format'
 )
@@ -47,6 +49,7 @@ def releases(ctx, limit, output):
         if output == 'json':
             # Output as JSON
             import json
+
             click.echo(json.dumps(releases, indent=2))
         else:
             # Format releases as a table
@@ -120,6 +123,7 @@ def pipelines(ctx, limit, concourse_url, concourse_team, pipeline, output):
         if output == 'json':
             # Output as JSON
             import json
+
             click.echo(json.dumps(builds, indent=2))
         else:
             # Format builds as a table

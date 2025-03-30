@@ -43,6 +43,7 @@ from ..utils import check_git_repo, get_repo_info
 )
 @click.option('--concourse-url', help='Concourse CI API URL')
 @click.option('--concourse-team', help='Concourse CI team name')
+@click.option('--concourse-target', help='Concourse target name from ~/.flyrc')
 @click.option('--pipeline', help='Concourse pipeline name to trigger')
 @click.option('--job', default='build-and-release', help='Concourse job name to trigger')
 @click.option('--version-file', help='Path to the file containing version information')
@@ -61,10 +62,12 @@ from ..utils import check_git_repo, get_repo_info
     type=click.Choice(['checkout', 'rebase', 'merge', 'merge-squash']),
     default='rebase',
     help="""Strategy to use when target and source branches differ:
-    checkout: Simply switch to the target branch (abandons working branch changes)
-    rebase: (default) Apply source branch commits on top of the target branch
-    merge: Create a merge commit to bring source changes into target (--no-ff)
-    merge-squash: Squash all source changes into a single commit on target""",
+
+  • checkout:     Simply switch to the target branch (abandons working branch changes)
+  • rebase:       (default) Apply source branch commits on top of the target branch
+  • merge:        Create a merge commit to bring source changes into target (--no-ff)
+  • merge-squash: Squash all source changes into a single commit on target
+""",
 )
 @click.pass_context
 def create_release(
@@ -76,6 +79,7 @@ def create_release(
     dry_run,
     concourse_url,
     concourse_team,
+    concourse_target,
     pipeline,
     job,
     version_file,
@@ -444,11 +448,16 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         click.echo(f'✓ GitHub release created: {release.get("html_url")}')
 
         # Trigger Concourse pipeline if requested
-        if concourse_url and concourse_team and pipeline:
+        # Can use either (concourse_url and concourse_team) or concourse_target
+        if ((concourse_url and concourse_team) or concourse_target) and pipeline:
             click.echo('Triggering Concourse CI pipeline...')
 
             try:
-                concourse_client = ConcourseClient(api_url=concourse_url, team=concourse_team)
+                concourse_client = ConcourseClient(
+                    api_url=concourse_url,
+                    team=concourse_team,
+                    target=concourse_target
+                )
 
                 variables = {'version': new_version, 'is_rollback': 'false'}
 

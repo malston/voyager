@@ -13,13 +13,14 @@ from ..utils import check_git_repo, get_repo_info
 
 @click.command('pipelines', context_settings=CONTEXT_SETTINGS)
 @click.option('--limit', '-l', default=5, help='Limit the number of pipelines shown')
-@click.option('--concourse-url', required=True, help='Concourse CI API URL')
-@click.option('--concourse-team', required=True, help='Concourse CI team name')
+@click.option('--concourse-url', help='Concourse CI API URL')
+@click.option('--concourse-team', help='Concourse CI team name')
+@click.option('--concourse-target', help='Concourse target name from ~/.flyrc')
 @click.option('--pipeline', required=True, help='Concourse pipeline name')
 @click.option(
     '--format', '-f', type=click.Choice(['table', 'json']), default='table', help='Output format'
 )
-def list_pipelines(limit, concourse_url, concourse_team, pipeline, format):
+def list_pipelines(limit, concourse_url, concourse_team, concourse_target, pipeline, format):
     """List recent release pipelines/builds."""
     if not check_git_repo():
         click.echo('Error: Current directory is not a git repository', err=True)
@@ -30,7 +31,11 @@ def list_pipelines(limit, concourse_url, concourse_team, pipeline, format):
         click.echo(f'Fetching recent builds for {owner}/{repo}...')
 
         # Initialize Concourse client
-        concourse_client = ConcourseClient(api_url=concourse_url, team=concourse_team)
+        concourse_client = ConcourseClient(
+            api_url=concourse_url,
+            team=concourse_team,
+            target=concourse_target
+        )
 
         # Fetch pipeline builds
         builds = concourse_client.get_pipeline_builds(pipeline, limit=limit)

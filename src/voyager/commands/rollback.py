@@ -19,6 +19,7 @@ from ..utils import check_git_repo, get_repo_info
 @click.option('-d', '--dry-run', is_flag=True, help='Perform a dry run without actual rollback')
 @click.option('--concourse-url', help='Concourse CI API URL')
 @click.option('--concourse-team', help='Concourse CI team name')
+@click.option('--concourse-target', help='Concourse target name from ~/.flyrc')
 @click.option('--pipeline', help='Concourse pipeline name to trigger')
 @click.option('--job', default='rollback', help='Concourse job name to trigger')
 @click.option('--version-file', help='Path to the file containing version information')
@@ -38,6 +39,7 @@ def rollback(
     dry_run,
     concourse_url,
     concourse_team,
+    concourse_target,
     pipeline,
     job,
     version_file,
@@ -281,11 +283,16 @@ Rolled back on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             )
 
         # Trigger Concourse pipeline if requested
-        if concourse_url and concourse_team and pipeline:
+        # Can use either (concourse_url and concourse_team) or concourse_target
+        if ((concourse_url and concourse_team) or concourse_target) and pipeline:
             click.echo('Triggering Concourse CI rollback pipeline...')
 
             try:
-                concourse_client = ConcourseClient(api_url=concourse_url, team=concourse_team)
+                concourse_client = ConcourseClient(
+                    api_url=concourse_url,
+                    team=concourse_team,
+                    target=concourse_target
+                )
 
                 variables = {'version': version, 'is_rollback': 'true'}
 

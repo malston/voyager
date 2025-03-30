@@ -14,9 +14,10 @@ from ..utils import check_git_repo, get_repo_info
 @click.command('init', context_settings=CONTEXT_SETTINGS)
 @click.option('--concourse-url', metavar='URL', help='Concourse CI API URL')
 @click.option('--concourse-team', metavar='TEAM', help='Concourse CI team name')
+@click.option('--concourse-target', metavar='TARGET', help='Concourse target name from ~/.flyrc')
 @click.option('--pipeline', metavar='NAME', help='Concourse pipeline name')
 @click.pass_context
-def init_repo(ctx, concourse_url, concourse_team, pipeline):
+def init_repo(ctx, concourse_url, concourse_team, concourse_target, pipeline):
     """Initialize the current repository for Voyager."""
     if not check_git_repo():
         click.echo('Error: Current directory is not a git repository', err=True)
@@ -110,15 +111,17 @@ def init_repo(ctx, concourse_url, concourse_team, pipeline):
         if not config_file.exists() or click.confirm(
             f'The file {config_file} already exists. Overwrite?'
         ):
-            create_voyager_config(config_file, owner, repo, concourse_url, concourse_team, pipeline)
+            create_voyager_config(
+                config_file, owner, repo, concourse_url, concourse_team, concourse_target, pipeline
+            )
             click.echo(f'✓ Created Voyager configuration: {config_file}')
 
         click.echo('\nVoyager initialized successfully!')
         click.echo('\nNext steps:')
         click.echo('1. Review the created configuration files and customize as needed.')
 
-        if concourse_url and concourse_team:
-            click.echo('2. Set the CONCOURSE_TOKEN environment variable.')
+        if (concourse_url and concourse_team) or concourse_target:
+            click.echo('2. Set CONCOURSE_TOKEN env var (or use --concourse-target).')
             click.echo('3. Run the pipeline setup script: ./ci/set-pipeline.sh')
 
         click.echo(
@@ -306,8 +309,10 @@ GITHUB_TOKEN=your_github_token
 
     if include_concourse:
         env_content += """
-# Concourse CI token
+# Concourse CI authentication (you can use either TOKEN or TARGET)
 CONCOURSE_TOKEN=your_concourse_token
+# Or use a target from your ~/.flyrc file
+# CONCOURSE_TARGET=your_concourse_target
 """
 
     with open(file_path, 'w') as f:
@@ -315,7 +320,8 @@ CONCOURSE_TOKEN=your_concourse_token
 
 
 def create_voyager_config(
-    file_path, owner, repo, concourse_url=None, concourse_team=None, pipeline=None
+    file_path, owner, repo, concourse_url=None, concourse_team=None,
+    concourse_target=None, pipeline=None
 ):
     """Create a voyager.yml configuration file."""
     config = {
@@ -323,14 +329,21 @@ def create_voyager_config(
         'versioning': {'default_bump': 'patch'},
     }
 
-    if concourse_url and concourse_team:
+    # Can use either (concourse_url and concourse_team) or concourse_target
+    if (concourse_url and concourse_team) or concourse_target:
         config['concourse'] = {
-            'url': concourse_url,
-            'team': concourse_team,
             'pipeline': pipeline or 'release-pipeline',
             'release_job': 'build-and-release',
             'rollback_job': 'rollback',
         }
+
+        # Add URL and team if provided explicitly
+        if concourse_url:
+            config['concourse']['url'] = concourse_url
+        if concourse_team:
+            config['concourse']['team'] = concourse_team
+        if concourse_target:
+            config['concourse']['target'] = concourse_target
 
     with open(file_path, 'w') as f:
         yaml.dump(config, f, default_flow_style=False)

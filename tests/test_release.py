@@ -117,6 +117,8 @@ def test_release_branch_with_rebase(mock_env_setup):
     # Set up mock methods that may not exist yet
     mock_env_setup['repo_instance'].git.rebase = MagicMock()
     mock_env_setup['repo_instance'].git.fetch = MagicMock()
+    mock_env_setup['repo_instance'].git.pull = MagicMock()
+    mock_env_setup['repo_instance'].git.branch = MagicMock()
     
     # Create a test environment
     with runner.isolated_filesystem():
@@ -130,18 +132,29 @@ def test_release_branch_with_rebase(mock_env_setup):
         # Verify git operations were called
         mock_env_setup['repo_instance'].git.fetch.assert_any_call('origin', 'develop')
         mock_env_setup['repo_instance'].git.fetch.assert_any_call('origin', 'main')
-        mock_env_setup['repo_instance'].git.checkout.assert_any_call('main')
         
-        # Check that checkout -b was called (without checking the exact branch name with timestamp)
+        # Check that a backup branch was created
         checkout_calls = str(mock_env_setup['repo_instance'].git.checkout.call_args_list)
-        assert "'-b', 'temp-develop-" in checkout_calls
-        assert "origin/develop" in checkout_calls
+        assert "'-b', 'backup-main-" in checkout_calls
         
-        # Check rebase was called
-        mock_env_setup['repo_instance'].git.rebase.assert_called_with('main')
+        # Check that we switched to the target branch
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
+        
+        # Check that we tried to pull the latest changes
+        mock_env_setup['repo_instance'].git.pull.assert_called_with('origin', 'develop')
+        
+        # Check rebase was called with the backup branch
+        # Note: We're checking if rebase was called, but not the exact parameter
+        # because the branch name includes a timestamp
+        assert mock_env_setup['repo_instance'].git.rebase.called
+        
+        # Check backup branch was deleted
+        assert mock_env_setup['repo_instance'].git.branch.called
+        branch_calls = str(mock_env_setup['repo_instance'].git.branch.call_args_list)
+        assert "'-D', 'backup-main-" in branch_calls
         
         # Verify output message contains rebase text
-        assert "Rebasing 'develop' onto 'main'" in result.output
+        assert "Rebasing changes from 'main' onto 'develop'" in result.output
 
 
 def test_release_branch_with_merge(mock_env_setup):
@@ -151,6 +164,8 @@ def test_release_branch_with_merge(mock_env_setup):
     # Set up mock methods that may not exist yet
     mock_env_setup['repo_instance'].git.merge = MagicMock()
     mock_env_setup['repo_instance'].git.fetch = MagicMock()
+    mock_env_setup['repo_instance'].git.pull = MagicMock()
+    mock_env_setup['repo_instance'].git.branch = MagicMock()
     
     # Create a test environment
     with runner.isolated_filesystem():
@@ -164,17 +179,27 @@ def test_release_branch_with_merge(mock_env_setup):
         # Verify git operations were called
         mock_env_setup['repo_instance'].git.fetch.assert_any_call('origin', 'develop')
         mock_env_setup['repo_instance'].git.fetch.assert_any_call('origin', 'main')
-        mock_env_setup['repo_instance'].git.checkout.assert_any_call('main')
         
-        # Check that checkout -b was called (without checking the exact branch name with timestamp)
+        # Check that a backup branch was created
         checkout_calls = str(mock_env_setup['repo_instance'].git.checkout.call_args_list)
-        assert "'-b', 'temp-main-merge-" in checkout_calls
+        assert "'-b', 'backup-main-" in checkout_calls
+        
+        # Check that we switched to the target branch
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
+        
+        # Check that we tried to pull the latest changes
+        mock_env_setup['repo_instance'].git.pull.assert_called_with('origin', 'develop')
         
         # Check merge was called with --no-ff
-        mock_env_setup['repo_instance'].git.merge.assert_called_with('origin/develop', '--no-ff')
+        mock_env_setup['repo_instance'].git.merge.assert_called_with('main', '--no-ff')
+        
+        # Check backup branch was deleted
+        assert mock_env_setup['repo_instance'].git.branch.called
+        branch_calls = str(mock_env_setup['repo_instance'].git.branch.call_args_list)
+        assert "'-D', 'backup-main-" in branch_calls
         
         # Verify output message contains merge text
-        assert "Merging 'develop' into 'main'" in result.output
+        assert "Merging changes from 'main' into 'develop'" in result.output
 
 
 def test_release_branch_with_squash_merge(mock_env_setup):
@@ -184,6 +209,8 @@ def test_release_branch_with_squash_merge(mock_env_setup):
     # Set up mock methods that may not exist yet
     mock_env_setup['repo_instance'].git.merge = MagicMock()
     mock_env_setup['repo_instance'].git.fetch = MagicMock()
+    mock_env_setup['repo_instance'].git.pull = MagicMock()
+    mock_env_setup['repo_instance'].git.branch = MagicMock()
     
     # Create a test environment
     with runner.isolated_filesystem():
@@ -197,22 +224,32 @@ def test_release_branch_with_squash_merge(mock_env_setup):
         # Verify git operations were called
         mock_env_setup['repo_instance'].git.fetch.assert_any_call('origin', 'develop')
         mock_env_setup['repo_instance'].git.fetch.assert_any_call('origin', 'main')
-        mock_env_setup['repo_instance'].git.checkout.assert_any_call('main')
         
-        # Check that checkout -b was called (without checking the exact branch name with timestamp)
+        # Check that a backup branch was created
         checkout_calls = str(mock_env_setup['repo_instance'].git.checkout.call_args_list)
-        assert "'-b', 'temp-main-squash-" in checkout_calls
+        assert "'-b', 'backup-main-" in checkout_calls
+        
+        # Check that we switched to the target branch
+        mock_env_setup['repo_instance'].git.checkout.assert_any_call('develop')
+        
+        # Check that we tried to pull the latest changes
+        mock_env_setup['repo_instance'].git.pull.assert_called_with('origin', 'develop')
         
         # Check merge was called with --squash
-        mock_env_setup['repo_instance'].git.merge.assert_called_with('origin/develop', '--squash')
+        mock_env_setup['repo_instance'].git.merge.assert_called_with('main', '--squash')
         
         # Verify commit was called with appropriate message - using any_call because we have other commits
         mock_env_setup['repo_instance'].git.commit.assert_any_call(
-            '-m', "Squashed merge of 'develop' into 'main' for release"
+            '-m', "Squashed merge of 'main' into 'develop' for release"
         )
         
+        # Check backup branch was deleted
+        assert mock_env_setup['repo_instance'].git.branch.called
+        branch_calls = str(mock_env_setup['repo_instance'].git.branch.call_args_list)
+        assert "'-D', 'backup-main-" in branch_calls
+        
         # Verify output message contains squash text
-        assert "Squash merging 'develop' into 'main'" in result.output
+        assert "Squash merging changes from 'main' into 'develop'" in result.output
 
 
 def test_release_nonexistent_branch(mock_env_setup):

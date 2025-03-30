@@ -107,56 +107,100 @@ def create_release(
                     git_repo.git.checkout(branch)
                     click.echo(f"Switched to branch '{branch}'")
                 elif merge_strategy == 'rebase':
-                    # Rebase target branch onto current working branch
-                    # This ensures commits from working branch are applied on top of the release branch
-                    click.echo(f"Rebasing '{branch}' onto '{original_branch}'...")
+                    # Rebase the changes from the working branch onto the target branch
+                    click.echo(f"Rebasing changes from '{original_branch}' onto '{branch}'...")
                     # First ensure we have latest of both branches
                     git_repo.git.fetch('origin', branch)
                     git_repo.git.fetch('origin', original_branch)
-                    # Stay on original branch
+                    
+                    # First, create a backup of the current branch in case something goes wrong
+                    backup_branch = f"backup-{original_branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    click.echo(f"Creating backup branch '{backup_branch}' of your current work")
+                    git_repo.git.checkout('-b', backup_branch)
                     git_repo.git.checkout(original_branch)
-                    # Create a temporary branch from the target branch to avoid
-                    # modifying remote branches directly
-                    temp_branch = f"temp-{branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                    git_repo.git.checkout('-b', temp_branch, f"origin/{branch}")
-                    # Rebase the temp branch (from target) onto original branch
-                    git_repo.git.rebase(original_branch)
-                    # Now checkout the rebased temp branch for the release
-                    git_repo.git.checkout(temp_branch)
-                    click.echo(f"Created temporary branch '{temp_branch}' with '{branch}' rebased onto '{original_branch}'")
+                    
+                    # Now check out the target branch and update it
+                    click.echo(f"Checking out target branch '{branch}'")
+                    git_repo.git.checkout(branch)
+                    
+                    # Pull latest from remote to make sure we're up to date
+                    try:
+                        git_repo.git.pull('origin', branch)
+                    except git.GitCommandError:
+                        click.echo(f"Could not pull latest changes for '{branch}', continuing with local version")
+                    
+                    # Rebase the target branch onto the original branch
+                    # This takes commits from the original branch and applies them on top of the target branch
+                    git_repo.git.rebase(backup_branch)
+                    click.echo(f"Successfully rebased changes from '{original_branch}' onto '{branch}'")
+                    
+                    # Clean up the backup branch if the rebase was successful
+                    git_repo.git.branch('-D', backup_branch)
+                    click.echo(f"Removed backup branch '{backup_branch}'")
+                    
                 elif merge_strategy == 'merge':
-                    # Merge target branch into current branch with temporary branch
-                    click.echo(f"Merging '{branch}' into '{original_branch}'...")
+                    # Merge changes from working branch into the target branch
+                    click.echo(f"Merging changes from '{original_branch}' into '{branch}'...")
                     # First ensure we have latest of both branches
                     git_repo.git.fetch('origin', branch)
                     git_repo.git.fetch('origin', original_branch)
-                    # Stay on original branch
+                    
+                    # First, create a backup of the current branch in case something goes wrong
+                    backup_branch = f"backup-{original_branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    click.echo(f"Creating backup branch '{backup_branch}' of your current work")
+                    git_repo.git.checkout('-b', backup_branch)
                     git_repo.git.checkout(original_branch)
-                    # Create a temporary branch to perform the merge
-                    temp_branch = f"temp-{original_branch}-merge-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                    git_repo.git.checkout('-b', temp_branch)
-                    # Merge the target branch into the temp branch
-                    git_repo.git.merge(f"origin/{branch}", '--no-ff')
-                    # Stay on the temp branch for the release
-                    click.echo(f"Created temporary branch '{temp_branch}' with '{branch}' merged into '{original_branch}'")
+                    
+                    # Now check out the target branch and update it
+                    click.echo(f"Checking out target branch '{branch}'")
+                    git_repo.git.checkout(branch)
+                    
+                    # Pull latest from remote to make sure we're up to date
+                    try:
+                        git_repo.git.pull('origin', branch)
+                    except git.GitCommandError:
+                        click.echo(f"Could not pull latest changes for '{branch}', continuing with local version")
+                    
+                    # Merge the original branch into the target branch
+                    git_repo.git.merge(original_branch, '--no-ff')
+                    click.echo(f"Successfully merged changes from '{original_branch}' into '{branch}'")
+                    
+                    # Clean up the backup branch if the merge was successful
+                    git_repo.git.branch('-D', backup_branch)
+                    click.echo(f"Removed backup branch '{backup_branch}'")
+                    
                 elif merge_strategy == 'merge-squash':
-                    # Squash merge target branch into current branch with temporary branch
-                    click.echo(f"Squash merging '{branch}' into '{original_branch}'...")
+                    # Squash merge changes from working branch into the target branch
+                    click.echo(f"Squash merging changes from '{original_branch}' into '{branch}'...")
                     # First ensure we have latest of both branches
                     git_repo.git.fetch('origin', branch)
                     git_repo.git.fetch('origin', original_branch)
-                    # Stay on original branch
+                    
+                    # First, create a backup of the current branch in case something goes wrong
+                    backup_branch = f"backup-{original_branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    click.echo(f"Creating backup branch '{backup_branch}' of your current work")
+                    git_repo.git.checkout('-b', backup_branch)
                     git_repo.git.checkout(original_branch)
-                    # Create a temporary branch to perform the squash merge
-                    temp_branch = f"temp-{original_branch}-squash-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                    git_repo.git.checkout('-b', temp_branch)
-                    # Squash merge the target branch into the temp branch
-                    git_repo.git.merge(f"origin/{branch}", '--squash')
-                    # Create the squash commit
-                    commit_msg = f"Squashed merge of '{branch}' into '{original_branch}' for release"
+                    
+                    # Now check out the target branch and update it
+                    click.echo(f"Checking out target branch '{branch}'")
+                    git_repo.git.checkout(branch)
+                    
+                    # Pull latest from remote to make sure we're up to date
+                    try:
+                        git_repo.git.pull('origin', branch)
+                    except git.GitCommandError:
+                        click.echo(f"Could not pull latest changes for '{branch}', continuing with local version")
+                    
+                    # Squash merge the original branch into the target branch
+                    git_repo.git.merge(original_branch, '--squash')
+                    commit_msg = f"Squashed merge of '{original_branch}' into '{branch}' for release"
                     git_repo.git.commit('-m', commit_msg)
-                    # Stay on the temp branch for the release
-                    click.echo(f"Created temporary branch '{temp_branch}' with '{branch}' squash merged into '{original_branch}'")
+                    click.echo(f"Successfully squash merged changes from '{original_branch}' into '{branch}'")
+                    
+                    # Clean up the backup branch if the squash merge was successful
+                    git_repo.git.branch('-D', backup_branch)
+                    click.echo(f"Removed backup branch '{backup_branch}'")
                     
                 # Record the branch we're on after merge strategy
                 current_branch = git_repo.active_branch.name

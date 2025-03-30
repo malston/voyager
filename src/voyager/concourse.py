@@ -38,7 +38,7 @@ def get_flyrc_data(target: str = None) -> Optional[Dict]:
 
         return flyrc_data
     except (yaml.YAMLError, IOError) as e:
-        click.echo(f"Error reading flyrc file: {e}", err=True)
+        click.echo(f'Error reading flyrc file: {e}', err=True)
         return None
 
 
@@ -62,7 +62,7 @@ def get_concourse_data_from_flyrc(target: str) -> Optional[Dict]:
     result = {
         'team': target_data.get('team'),
         'api_url': target_data.get('api'),
-        'token': target_data.get('token', {}).get('value')
+        'token': target_data.get('token', {}).get('value'),
     }
 
     # Ensure we have the minimum required information
@@ -126,8 +126,13 @@ def get_team_from_flyrc(target: str) -> Optional[str]:
 class ConcourseClient:
     """Client for interacting with Concourse CI."""
 
-    def __init__(self, api_url: Optional[str] = None, team: Optional[str] = None,
-                 token: Optional[str] = None, target: Optional[str] = None):
+    def __init__(
+        self,
+        api_url: Optional[str] = None,
+        team: Optional[str] = None,
+        token: Optional[str] = None,
+        target: Optional[str] = None,
+    ):
         """
         Initialize a Concourse client.
 

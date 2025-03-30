@@ -30,7 +30,7 @@ from ..utils import check_git_repo, get_repo_info
 @click.option(
     '--version-branch',
     default='version',
-    help='Branch to check for version information (defaults to "version")',
+    help='Branch to check for version information',
 )
 @click.pass_context
 def rollback(
@@ -289,9 +289,7 @@ Rolled back on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
             try:
                 concourse_client = ConcourseClient(
-                    api_url=concourse_url,
-                    team=concourse_team,
-                    target=concourse_target
+                    api_url=concourse_url, team=concourse_team, target=concourse_target
                 )
 
                 variables = {'version': version, 'is_rollback': 'true'}

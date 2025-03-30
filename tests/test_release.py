@@ -228,7 +228,7 @@ def test_release_branch_with_squash_merge(mock_env_setup):
         # Run the release command with squash merge strategy
         result = runner.invoke(
             create_release,
-            ['--release-branch', 'develop', '--type', 'minor', '--merge-strategy', 'merge-squash'],
+            ['--release-branch', 'develop', '--type', 'minor', '--merge-strategy', 'squash'],
         )
 
         # Check the command executed successfully

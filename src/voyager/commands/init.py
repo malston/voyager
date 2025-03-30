@@ -320,8 +320,13 @@ CONCOURSE_TOKEN=your_concourse_token
 
 
 def create_voyager_config(
-    file_path, owner, repo, concourse_url=None, concourse_team=None,
-    concourse_target=None, pipeline=None
+    file_path,
+    owner,
+    repo,
+    concourse_url=None,
+    concourse_team=None,
+    concourse_target=None,
+    pipeline=None,
 ):
     """Create a voyager.yml configuration file."""
     config = {

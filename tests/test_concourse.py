@@ -22,24 +22,18 @@ def create_sample_flyrc_content():
             'example': {
                 'api': 'https://concourse.example.com',
                 'team': 'main',
-                'token': {
-                    'type': 'bearer',
-                    'value': 'sample-token-main'
-                }
+                'token': {'type': 'bearer', 'value': 'sample-token-main'},
             },
             'another': {
                 'api': 'https://concourse.another.com',
                 'team': 'development',
-                'token': {
-                    'type': 'bearer',
-                    'value': 'sample-token-dev'
-                }
+                'token': {'type': 'bearer', 'value': 'sample-token-dev'},
             },
             'no-token': {
                 'api': 'https://concourse.test.com',
-                'team': 'test'
+                'team': 'test',
                 # No token section
-            }
+            },
         }
     }
 
@@ -50,10 +44,9 @@ def test_get_flyrc_data():
     flyrc_yaml = yaml.dump(flyrc_content)
 
     # Mock the home directory and file open
-    with patch('voyager.concourse.Path.home') as mock_home, \
-         patch('voyager.concourse.Path.exists', return_value=True), \
-         patch('builtins.open', mock_open(read_data=flyrc_yaml)):
-
+    with patch('voyager.concourse.Path.home') as mock_home, patch(
+        'voyager.concourse.Path.exists', return_value=True
+    ), patch('builtins.open', mock_open(read_data=flyrc_yaml)):
         mock_home.return_value = Path('/mock/home')
 
         # Test getting all data
@@ -77,10 +70,9 @@ def test_get_concourse_data_from_flyrc():
     flyrc_yaml = yaml.dump(flyrc_content)
 
     # Mock the home directory and file open
-    with patch('voyager.concourse.Path.home') as mock_home, \
-         patch('voyager.concourse.Path.exists', return_value=True), \
-         patch('builtins.open', mock_open(read_data=flyrc_yaml)):
-
+    with patch('voyager.concourse.Path.home') as mock_home, patch(
+        'voyager.concourse.Path.exists', return_value=True
+    ), patch('builtins.open', mock_open(read_data=flyrc_yaml)):
         mock_home.return_value = Path('/mock/home')
 
         # Test with existing target
@@ -112,10 +104,9 @@ def test_get_token_from_flyrc():
     flyrc_yaml = yaml.dump(flyrc_content)
 
     # Mock the home directory and file open
-    with patch('voyager.concourse.Path.home') as mock_home, \
-         patch('voyager.concourse.Path.exists', return_value=True), \
-         patch('builtins.open', mock_open(read_data=flyrc_yaml)):
-
+    with patch('voyager.concourse.Path.home') as mock_home, patch(
+        'voyager.concourse.Path.exists', return_value=True
+    ), patch('builtins.open', mock_open(read_data=flyrc_yaml)):
         mock_home.return_value = Path('/mock/home')
 
         # Test with existing target
@@ -141,10 +132,9 @@ def test_get_api_url_from_flyrc():
     flyrc_yaml = yaml.dump(flyrc_content)
 
     # Mock the home directory and file open
-    with patch('voyager.concourse.Path.home') as mock_home, \
-         patch('voyager.concourse.Path.exists', return_value=True), \
-         patch('builtins.open', mock_open(read_data=flyrc_yaml)):
-
+    with patch('voyager.concourse.Path.home') as mock_home, patch(
+        'voyager.concourse.Path.exists', return_value=True
+    ), patch('builtins.open', mock_open(read_data=flyrc_yaml)):
         mock_home.return_value = Path('/mock/home')
 
         # Test with existing target
@@ -170,10 +160,9 @@ def test_get_team_from_flyrc():
     flyrc_yaml = yaml.dump(flyrc_content)
 
     # Mock the home directory and file open
-    with patch('voyager.concourse.Path.home') as mock_home, \
-         patch('voyager.concourse.Path.exists', return_value=True), \
-         patch('builtins.open', mock_open(read_data=flyrc_yaml)):
-
+    with patch('voyager.concourse.Path.home') as mock_home, patch(
+        'voyager.concourse.Path.exists', return_value=True
+    ), patch('builtins.open', mock_open(read_data=flyrc_yaml)):
         mock_home.return_value = Path('/mock/home')
 
         # Test with existing target
@@ -202,29 +191,27 @@ def test_get_token_from_flyrc_file_not_exists():
 
 def test_get_token_from_flyrc_yaml_error():
     """Test handling of YAML parsing errors."""
-    with patch('voyager.concourse.Path.home') as mock_home, \
-         patch('voyager.concourse.Path.exists', return_value=True), \
-         patch('builtins.open', mock_open(read_data='invalid: yaml: content:')), \
-         patch('yaml.safe_load', side_effect=yaml.YAMLError("YAML error")), \
-         patch('click.echo') as mock_echo:
-
+    with patch('voyager.concourse.Path.home') as mock_home, patch(
+        'voyager.concourse.Path.exists', return_value=True
+    ), patch('builtins.open', mock_open(read_data='invalid: yaml: content:')), patch(
+        'yaml.safe_load', side_effect=yaml.YAMLError('YAML error')
+    ), patch('click.echo') as mock_echo:
         mock_home.return_value = Path('/mock/home')
 
         token = get_token_from_flyrc('example')
         assert token is None
         mock_echo.assert_called_once()
-        assert "Error reading flyrc file" in mock_echo.call_args[0][0]
+        assert 'Error reading flyrc file' in mock_echo.call_args[0][0]
 
 
 def test_concourse_client_with_target():
     """Test ConcourseClient initialization using flyrc target."""
     # Create a test environment without CONCOURSE_TOKEN
-    with patch.dict(os.environ, {}, clear=True), \
-         patch('voyager.concourse.get_api_url_from_flyrc',
-               return_value='https://concourse.flyrc.com'), \
-         patch('voyager.concourse.get_team_from_flyrc', return_value='main-team'), \
-         patch('voyager.concourse.get_token_from_flyrc', return_value='flyrc-token'):
-
+    with patch.dict(os.environ, {}, clear=True), patch(
+        'voyager.concourse.get_api_url_from_flyrc', return_value='https://concourse.flyrc.com'
+    ), patch('voyager.concourse.get_team_from_flyrc', return_value='main-team'), patch(
+        'voyager.concourse.get_token_from_flyrc', return_value='flyrc-token'
+    ):
         client = ConcourseClient(target='example')
 
         # Verify the client is using the values from flyrc
@@ -238,9 +225,9 @@ def test_concourse_client_explicit_params():
     """Test ConcourseClient initialization using explicit parameters."""
     with patch.dict(os.environ, {}, clear=True):
         # Initialize with all parameters explicitly provided
-        client = ConcourseClient(api_url='https://concourse.explicit.com',
-                                team='explicit-team',
-                                token='explicit-token')
+        client = ConcourseClient(
+            api_url='https://concourse.explicit.com', team='explicit-team', token='explicit-token'
+        )
 
         # Verify the client is using the explicit values
         assert client.api_url == 'https://concourse.explicit.com'
@@ -250,18 +237,17 @@ def test_concourse_client_explicit_params():
 
 def test_concourse_client_parameter_priority():
     """Test ConcourseClient parameter priority (explicit > target)."""
-    with patch.dict(os.environ, {}, clear=True), \
-         patch('voyager.concourse.get_api_url_from_flyrc',
-               return_value='https://concourse.flyrc.com'), \
-         patch('voyager.concourse.get_team_from_flyrc', return_value='flyrc-team'), \
-         patch('voyager.concourse.get_token_from_flyrc', return_value='flyrc-token'):
-
+    with patch.dict(os.environ, {}, clear=True), patch(
+        'voyager.concourse.get_api_url_from_flyrc', return_value='https://concourse.flyrc.com'
+    ), patch('voyager.concourse.get_team_from_flyrc', return_value='flyrc-team'), patch(
+        'voyager.concourse.get_token_from_flyrc', return_value='flyrc-token'
+    ):
         # Explicit parameters should take priority over target values
         client = ConcourseClient(
             api_url='https://concourse.explicit.com',
             team='explicit-team',
             token='explicit-token',
-            target='example'
+            target='example',
         )
 
         assert client.api_url == 'https://concourse.explicit.com'
@@ -271,71 +257,64 @@ def test_concourse_client_parameter_priority():
 
 def test_concourse_client_no_url():
     """Test ConcourseClient with no URL available."""
-    with patch.dict(os.environ, {}, clear=True), \
-         patch('voyager.concourse.get_api_url_from_flyrc', return_value=None), \
-         patch('voyager.concourse.get_team_from_flyrc', return_value='team'), \
-         patch('voyager.concourse.get_token_from_flyrc', return_value='token'):
-
+    with patch.dict(os.environ, {}, clear=True), patch(
+        'voyager.concourse.get_api_url_from_flyrc', return_value=None
+    ), patch('voyager.concourse.get_team_from_flyrc', return_value='team'), patch(
+        'voyager.concourse.get_token_from_flyrc', return_value='token'
+    ):
         # Should raise ValueError when no URL is available
         with pytest.raises(ValueError) as excinfo:
             ConcourseClient(target='example')
 
         # Check error message
-        assert "Concourse API URL not found" in str(excinfo.value)
-        assert "flyrc" in str(excinfo.value)
+        assert 'Concourse API URL not found' in str(excinfo.value)
+        assert 'flyrc' in str(excinfo.value)
 
 
 def test_concourse_client_env_token_priority():
     """Test ConcourseClient token priority with environment variable."""
     # Test with environment variable token available
-    with patch.dict(os.environ, {'CONCOURSE_TOKEN': 'env-token'}, clear=True), \
-         patch('voyager.concourse.get_token_from_flyrc', return_value='flyrc-token'):
-
+    with patch.dict(os.environ, {'CONCOURSE_TOKEN': 'env-token'}, clear=True), patch(
+        'voyager.concourse.get_token_from_flyrc', return_value='flyrc-token'
+    ):
         # Explicit token should take priority over env var and flyrc
         client = ConcourseClient(
-            api_url='https://concourse.example.com',
-            team='main',
-            token='explicit-token'
+            api_url='https://concourse.example.com', team='main', token='explicit-token'
         )
         assert client.token == 'explicit-token'
 
         # Env var should take priority over flyrc
-        client = ConcourseClient(
-            api_url='https://concourse.example.com',
-            team='main'
-        )
+        client = ConcourseClient(api_url='https://concourse.example.com', team='main')
         assert client.token == 'env-token'
 
 
 def test_concourse_client_no_token():
     """Test ConcourseClient with no token available."""
-    with patch.dict(os.environ, {}, clear=True), \
-         patch('voyager.concourse.get_token_from_flyrc', return_value=None), \
-         patch('voyager.concourse.get_api_url_from_flyrc',
-               return_value='https://concourse.example.com'), \
-         patch('voyager.concourse.get_team_from_flyrc', return_value='main'):
-
+    with patch.dict(os.environ, {}, clear=True), patch(
+        'voyager.concourse.get_token_from_flyrc', return_value=None
+    ), patch(
+        'voyager.concourse.get_api_url_from_flyrc', return_value='https://concourse.example.com'
+    ), patch('voyager.concourse.get_team_from_flyrc', return_value='main'):
         # Should raise ValueError when no token is available
         with pytest.raises(ValueError) as excinfo:
             ConcourseClient(target='example')
 
         # Check error message
-        assert "Concourse token not found" in str(excinfo.value)
-        assert "environment variable" in str(excinfo.value)
+        assert 'Concourse token not found' in str(excinfo.value)
+        assert 'environment variable' in str(excinfo.value)
 
 
 def test_concourse_client_no_team():
     """Test ConcourseClient with no team available."""
-    with patch.dict(os.environ, {}, clear=True), \
-         patch('voyager.concourse.get_token_from_flyrc', return_value='token'), \
-         patch('voyager.concourse.get_api_url_from_flyrc',
-               return_value='https://concourse.example.com'), \
-         patch('voyager.concourse.get_team_from_flyrc', return_value=None):
-
+    with patch.dict(os.environ, {}, clear=True), patch(
+        'voyager.concourse.get_token_from_flyrc', return_value='token'
+    ), patch(
+        'voyager.concourse.get_api_url_from_flyrc', return_value='https://concourse.example.com'
+    ), patch('voyager.concourse.get_team_from_flyrc', return_value=None):
         # Should raise ValueError when no team is available
         with pytest.raises(ValueError) as excinfo:
             ConcourseClient(target='example')
 
         # Check error message
-        assert "Concourse team not found" in str(excinfo.value)
-        assert "flyrc" in str(excinfo.value)
+        assert 'Concourse team not found' in str(excinfo.value)
+        assert 'flyrc' in str(excinfo.value)

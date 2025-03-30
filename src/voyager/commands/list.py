@@ -113,9 +113,7 @@ def pipelines(ctx, limit, concourse_url, concourse_team, concourse_target, pipel
 
         # Initialize Concourse client
         concourse_client = ConcourseClient(
-            api_url=concourse_url,
-            team=concourse_team,
-            target=concourse_target
+            api_url=concourse_url, team=concourse_team, target=concourse_target
         )
 
         # Fetch pipeline builds

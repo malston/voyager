@@ -18,30 +18,32 @@ class TestPipelineRunner(unittest.TestCase):
         self.foundation = 'test-foundation'
         self.repo = 'test-repo'
         self.pipeline = 'test-pipeline'
-        
+
         # Mock file system operations
         patcher = patch('os.path.exists')
         self.mock_exists = patcher.start()
         self.addCleanup(patcher.stop)
-        
+
         patcher = patch('os.listdir')
         self.mock_listdir = patcher.start()
         self.addCleanup(patcher.stop)
-        
+
         patcher = patch('os.path.isfile')
         self.mock_isfile = patcher.start()
         self.addCleanup(patcher.stop)
-        
+
         patcher = patch('os.access')
         self.mock_access = patcher.start()
         self.addCleanup(patcher.stop)
-        
+
         # Set up default mock behavior
-        self.mock_exists.side_effect = lambda path: path == os.path.expanduser(f'~/git/{self.repo}/ci')
+        self.mock_exists.side_effect = lambda path: path == os.path.expanduser(
+            f'~/git/{self.repo}/ci'
+        )
         self.mock_listdir.return_value = ['fly.sh']
         self.mock_isfile.return_value = True
         self.mock_access.return_value = True
-        
+
         self.expected_ci_dir = os.path.expanduser(f'~/git/{self.repo}/ci')
         self.pipeline_runner = PipelineRunner(self.foundation, self.repo, self.pipeline)
 
@@ -271,12 +273,15 @@ class TestPipelineRunner(unittest.TestCase):
 
     def test_run_pipeline_invalid_type(self):
         """Test running pipeline with invalid type."""
-        with patch.object(
-            self.pipeline_runner, '_get_user_confirmation'
-        ) as mock_confirm, patch('builtins.print') as mock_print:
+        with patch.object(self.pipeline_runner, '_get_user_confirmation') as mock_confirm, patch(
+            'builtins.print'
+        ) as mock_print:
             mock_confirm.return_value = True
             self.assertFalse(self.pipeline_runner.run_pipeline('invalid'))
-            mock_print.assert_called_with(f'{self.pipeline_runner.RED}Invalid pipeline type: invalid{self.pipeline_runner.NOCOLOR}')
+            mock_print.assert_called_with(
+                f'{self.pipeline_runner.RED}Invalid pipeline type: invalid'
+                f'{self.pipeline_runner.NOCOLOR}'
+            )
 
     def test_run_pipeline_user_cancels(self):
         """Test pipeline run when user cancels."""
@@ -324,4 +329,4 @@ class TestPipelineRunner(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()

@@ -7,6 +7,7 @@ from .click_utils import CONTEXT_SETTINGS
 from .commands.delete import delete_release
 from .commands.init import init_repo
 from .commands.list import list_group
+from .commands.pipeline import pipeline_group
 from .commands.release import create_release
 from .commands.rollback import rollback
 
@@ -31,6 +32,7 @@ cli.add_command(rollback)
 cli.add_command(delete_release)
 cli.add_command(init_repo)
 cli.add_command(list_group)
+cli.add_command(pipeline_group)
 
 if __name__ == '__main__':
     cli()

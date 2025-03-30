@@ -63,10 +63,10 @@ from ..utils import check_git_repo, get_repo_info
     default='rebase',
     help="""Strategy to use when target and source branches differ:
 
-  • checkout:     Simply switch to the target branch (abandons working branch changes)
-  • rebase:       (default) Apply source branch commits on top of the target branch
-  • merge:        Create a merge commit to bring source changes into target (--no-ff)
-  • merge-squash: Squash all source changes into a single commit on target
+  checkout     - Switch to target branch (abandons working branch changes)
+  rebase       - Default. Apply source branch commits on top of target branch
+  merge        - Create merge commit to bring source changes into target
+  merge-squash - Squash all source changes into a single commit on target
 """,
 )
 @click.pass_context

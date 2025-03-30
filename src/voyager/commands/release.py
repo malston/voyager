@@ -24,7 +24,9 @@ from ..utils import check_git_repo, get_repo_info
     help='Release type (major, minor, patch)',
 )
 @click.option('--message', '-m', help='Release message')
-@click.option('--branch', '-b', default='main', help='Branch to release from')
+@click.option(
+    '--branch', '-b', default='main', help='Branch to switch to and release from (defaults to main)'
+)
 @click.option(
     '--dry-run', '-d', is_flag=True, help='Perform a dry run without creating actual release'
 )
@@ -67,13 +69,35 @@ def create_release(
         # Get the git repo
         git_repo = git.Repo(os.getcwd())
 
-        # Ensure we're on the specified branch
-        current_branch = git_repo.active_branch.name
-        if current_branch != branch:
-            click.echo(f"Warning: You are on branch '{current_branch}', not '{branch}'")
-            if not click.confirm(f"Continue release from branch '{current_branch}'?"):
-                click.echo('Release canceled.')
-                sys.exit(0)
+        # Remember the original branch
+        original_branch = git_repo.active_branch.name
+
+        # Check if branch exists and switch to it if needed
+        branch_exists = False
+        for ref in git_repo.refs:
+            if ref.name == branch or ref.name == f'origin/{branch}':
+                branch_exists = True
+                break
+
+        if not branch_exists:
+            click.echo(f"Error: Branch '{branch}' does not exist")
+            click.echo('Available branches:')
+            for ref in git_repo.refs:
+                if not ref.name.startswith('origin/'):
+                    click.echo(f'  {ref.name}')
+            sys.exit(1)
+
+        # Switch to the specified branch if we're not already on it
+        if original_branch != branch:
+            click.echo(f"Switching to branch '{branch}' for release...")
+            try:
+                git_repo.git.checkout(branch)
+                click.echo(f"Switched to branch '{branch}'")
+            except git.GitCommandError as e:
+                click.echo(f"Error switching to branch '{branch}': {str(e)}")
+                if not click.confirm(f"Continue release from current branch '{original_branch}'?"):
+                    click.echo('Release canceled.')
+                    sys.exit(0)
 
         # Determine current version
         version_finder = VersionFinder(git_repo, version_file, version_pattern, version_branch)
@@ -172,6 +196,8 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
         # Push changes and tag
         click.echo('Pushing changes and tag to remote...')
+        # Get current branch again as it might have changed
+        current_branch = git_repo.active_branch.name
         git_repo.git.push('origin', current_branch)
         git_repo.git.push('origin', tag_name)
 
@@ -212,8 +238,26 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
         click.echo(f'✓ Release v{new_version} completed successfully!')
 
+        # Ask the user if they want to switch back to the original branch
+        if original_branch != git_repo.active_branch.name:
+            if click.confirm(f"Switch back to original branch '{original_branch}'?"):
+                try:
+                    git_repo.git.checkout(original_branch)
+                    click.echo(f"Switched back to branch '{original_branch}'")
+                except git.GitCommandError as e:
+                    click.echo(f"Error switching back to branch '{original_branch}': {str(e)}")
+
     except Exception as e:
         click.echo(f'Error creating release: {str(e)}', err=True)
+
+        # Always try to restore the original branch in case of error
+        if 'original_branch' in locals() and original_branch != git_repo.active_branch.name:
+            try:
+                git_repo.git.checkout(original_branch)
+                click.echo(f"Restored original branch '{original_branch}' after error")
+            except Exception:
+                pass  # Don't add more errors to the output
+
         sys.exit(1)
 
 

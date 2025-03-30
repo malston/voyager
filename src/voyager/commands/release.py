@@ -17,14 +17,26 @@ from ..utils import check_git_repo, get_repo_info
 
 @click.command('release', context_settings=CONTEXT_SETTINGS)
 @click.option(
-    '-t', '--type',
+    '-t',
+    '--type',
     type=click.Choice(['major', 'minor', 'patch']),
     default='patch',
     help='Release type (major, minor, patch)',
 )
 @click.option('-m', '--message', metavar='MSG', help='Release message')
 @click.option(
-    '-b', '--branch', default='main', metavar='BRANCH', help='Branch to switch to and release from'
+    '--release-branch',
+    '--target',
+    '-r',
+    default='main',
+    metavar='BRANCH',
+    help='Target branch to create the release from (defaults to main)',
+)
+@click.option(
+    '--working-branch',
+    '-w',
+    metavar='BRANCH',
+    help='Source branch containing your changes (defaults to current branch)',
 )
 @click.option(
     '-d', '--dry-run', is_flag=True, help='Perform a dry run without creating actual release'
@@ -43,12 +55,24 @@ from ..utils import check_git_repo, get_repo_info
     default='version',
     help='Branch to check for version information (defaults to "version")',
 )
+@click.option(
+    '--merge-strategy',
+    '-s',
+    type=click.Choice(['checkout', 'rebase', 'merge', 'merge-squash']),
+    default='rebase',
+    help="""Strategy to use when target and source branches differ:
+    checkout: Simply switch to the target branch (abandons working branch changes)
+    rebase: (default) Apply source branch commits on top of the target branch
+    merge: Create a merge commit to bring source changes into target (--no-ff)
+    merge-squash: Squash all source changes into a single commit on target""",
+)
 @click.pass_context
 def create_release(
     ctx,
     type,
     message,
-    branch,
+    release_branch,
+    working_branch,
     dry_run,
     concourse_url,
     concourse_team,
@@ -57,6 +81,7 @@ def create_release(
     version_file,
     version_pattern,
     version_branch,
+    merge_strategy,
 ):
     """Create a new release from the current branch."""
     if not check_git_repo():
@@ -72,142 +97,232 @@ def create_release(
         # Get the git repo
         git_repo = git.Repo(os.getcwd())
 
-        # Remember the original branch
-        original_branch = git_repo.active_branch.name
+        # Get the current branch
+        current_branch = git_repo.active_branch.name
 
-        # Check if branch exists and switch to it if needed
-        branch_exists = False
+        # If no working branch specified, use current branch
+        if not working_branch:
+            working_branch = current_branch
+            click.echo(f"Using current branch '{working_branch}' as the source of changes")
+
+        # Check if release branch exists
+        release_branch_exists = False
         for ref in git_repo.refs:
-            if ref.name == branch or ref.name == f'origin/{branch}':
-                branch_exists = True
+            if ref.name == release_branch or ref.name == f'origin/{release_branch}':
+                release_branch_exists = True
                 break
 
-        if not branch_exists:
-            click.echo(f"Error: Branch '{branch}' does not exist")
+        if not release_branch_exists:
+            click.echo(f"Error: Release branch '{release_branch}' does not exist")
             click.echo('Available branches:')
             for ref in git_repo.refs:
                 if not ref.name.startswith('origin/'):
                     click.echo(f'  {ref.name}')
             sys.exit(1)
 
-        # Switch to the specified branch if we're not already on it
-        if original_branch != branch:
-            # Offer merge strategy options
-            click.echo(f"Branch '{branch}' is different from your current branch '{original_branch}'.")
-            merge_strategy = click.prompt(
-                "Choose merge strategy",
-                type=click.Choice(['checkout', 'rebase', 'merge', 'merge-squash']),
-                default='checkout'
+        # Check if working branch exists (if different from current)
+        if working_branch != current_branch:
+            working_branch_exists = False
+            for ref in git_repo.refs:
+                if ref.name == working_branch or ref.name == f'origin/{working_branch}':
+                    working_branch_exists = True
+                    break
+
+            if not working_branch_exists:
+                click.echo(f"Error: Working branch '{working_branch}' does not exist")
+                click.echo('Available branches:')
+                for ref in git_repo.refs:
+                    if not ref.name.startswith('origin/'):
+                        click.echo(f'  {ref.name}')
+                sys.exit(1)
+
+            # Switch to the specified working branch
+            click.echo(f"Switching to working branch '{working_branch}'...")
+            try:
+                git_repo.git.checkout(working_branch)
+                click.echo(f"Switched to branch '{working_branch}'")
+            except git.GitCommandError as e:
+                click.echo(f"Error switching to branch '{working_branch}': {str(e)}")
+                if not click.confirm(f"Continue release from current branch '{current_branch}'?"):
+                    click.echo('Release canceled.')
+                    sys.exit(0)
+                working_branch = current_branch
+
+        # If release and working branch are different, handle merge strategy
+        if working_branch != release_branch:
+            msg = (
+                f"Release branch '{release_branch}' is different from "
+                f"working branch '{working_branch}'."
             )
-            
+            click.echo(msg)
+
+            # Use provided merge strategy or prompt if not specified
+            if not merge_strategy:
+                merge_strategy = click.prompt(
+                    'Choose merge strategy',
+                    type=click.Choice(['checkout', 'rebase', 'merge', 'merge-squash']),
+                    default='rebase',
+                )
+            else:
+                click.echo(f"Using specified merge strategy: '{merge_strategy}'.")
+
             try:
                 if merge_strategy == 'checkout':
+                    # Warn the user that checkout won't merge their changes
+                    if working_branch != current_branch:
+                        click.echo(
+                            "⚠️ WARNING: Using 'checkout' strategy with a specified working branch"
+                        )
+                        click.echo(
+                            f"Your commits from '{working_branch}' will NOT be merged into '{release_branch}'"
+                        )
+                        if not click.confirm('Continue with checkout strategy?', default=False):
+                            click.echo('Release canceled.')
+                            sys.exit(0)
+
                     # Simple checkout
-                    click.echo(f"Checking out branch '{branch}' for release...")
-                    git_repo.git.checkout(branch)
-                    click.echo(f"Switched to branch '{branch}'")
+                    click.echo(f"Checking out branch '{release_branch}' for release...")
+                    git_repo.git.checkout(release_branch)
+                    click.echo(f"Switched to branch '{release_branch}'")
                 elif merge_strategy == 'rebase':
                     # Rebase the changes from the working branch onto the target branch
-                    click.echo(f"Rebasing changes from '{original_branch}' onto '{branch}'...")
+                    msg = f"Rebasing changes from '{working_branch}' onto '{release_branch}'..."
+                    click.echo(msg)
                     # First ensure we have latest of both branches
-                    git_repo.git.fetch('origin', branch)
-                    git_repo.git.fetch('origin', original_branch)
-                    
+                    git_repo.git.fetch('origin', release_branch)
+                    git_repo.git.fetch('origin', working_branch)
+
                     # First, create a backup of the current branch in case something goes wrong
-                    backup_branch = f"backup-{original_branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                    backup_branch = f'backup-{working_branch}-{timestamp}'
                     click.echo(f"Creating backup branch '{backup_branch}' of your current work")
                     git_repo.git.checkout('-b', backup_branch)
-                    git_repo.git.checkout(original_branch)
-                    
+                    git_repo.git.checkout(working_branch)
+
                     # Now check out the target branch and update it
-                    click.echo(f"Checking out target branch '{branch}'")
-                    git_repo.git.checkout(branch)
-                    
+                    click.echo(f"Checking out release branch '{release_branch}'")
+                    git_repo.git.checkout(release_branch)
+
                     # Pull latest from remote to make sure we're up to date
                     try:
-                        git_repo.git.pull('origin', branch)
+                        git_repo.git.pull('origin', release_branch)
                     except git.GitCommandError:
-                        click.echo(f"Could not pull latest changes for '{branch}', continuing with local version")
-                    
-                    # Rebase the target branch onto the original branch
-                    # This takes commits from the original branch and applies them on top of the target branch
+                        msg = (
+                            f"Could not pull latest changes for '{release_branch}', "
+                            f'continuing with local version'
+                        )
+                    click.echo(msg)
+
+                    # Rebase the target branch onto the working branch
+                    # This takes commits from the working branch and applies them
+                    # on top of the release branch
                     git_repo.git.rebase(backup_branch)
-                    click.echo(f"Successfully rebased changes from '{original_branch}' onto '{branch}'")
-                    
+                    msg = (
+                        f"Successfully rebased changes from '{working_branch}' "
+                        f"onto '{release_branch}'"
+                    )
+                    click.echo(msg)
+
                     # Clean up the backup branch if the rebase was successful
                     git_repo.git.branch('-D', backup_branch)
                     click.echo(f"Removed backup branch '{backup_branch}'")
-                    
+
                 elif merge_strategy == 'merge':
                     # Merge changes from working branch into the target branch
-                    click.echo(f"Merging changes from '{original_branch}' into '{branch}'...")
+                    click.echo(
+                        f"Merging changes from '{working_branch}' into '{release_branch}'..."
+                    )
                     # First ensure we have latest of both branches
-                    git_repo.git.fetch('origin', branch)
-                    git_repo.git.fetch('origin', original_branch)
-                    
+                    git_repo.git.fetch('origin', release_branch)
+                    git_repo.git.fetch('origin', working_branch)
+
                     # First, create a backup of the current branch in case something goes wrong
-                    backup_branch = f"backup-{original_branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    backup_branch = (
+                        f'backup-{working_branch}-{datetime.now().strftime("%Y%m%d%H%M%S")}'
+                    )
                     click.echo(f"Creating backup branch '{backup_branch}' of your current work")
                     git_repo.git.checkout('-b', backup_branch)
-                    git_repo.git.checkout(original_branch)
-                    
+                    git_repo.git.checkout(working_branch)
+
                     # Now check out the target branch and update it
-                    click.echo(f"Checking out target branch '{branch}'")
-                    git_repo.git.checkout(branch)
-                    
+                    click.echo(f"Checking out release branch '{release_branch}'")
+                    git_repo.git.checkout(release_branch)
+
                     # Pull latest from remote to make sure we're up to date
                     try:
-                        git_repo.git.pull('origin', branch)
+                        git_repo.git.pull('origin', release_branch)
                     except git.GitCommandError:
-                        click.echo(f"Could not pull latest changes for '{branch}', continuing with local version")
-                    
-                    # Merge the original branch into the target branch
-                    git_repo.git.merge(original_branch, '--no-ff')
-                    click.echo(f"Successfully merged changes from '{original_branch}' into '{branch}'")
-                    
+                        msg = (
+                            f"Could not pull latest changes for '{release_branch}', "
+                            f'continuing with local version'
+                        )
+                    click.echo(msg)
+
+                    # Merge the working branch into the release branch
+                    git_repo.git.merge(working_branch, '--no-ff')
+                    msg = (
+                        f"Successfully merged changes from '{working_branch}' "
+                        f"into '{release_branch}'"
+                    )
+                    click.echo(msg)
+
                     # Clean up the backup branch if the merge was successful
                     git_repo.git.branch('-D', backup_branch)
                     click.echo(f"Removed backup branch '{backup_branch}'")
-                    
+
                 elif merge_strategy == 'merge-squash':
                     # Squash merge changes from working branch into the target branch
-                    click.echo(f"Squash merging changes from '{original_branch}' into '{branch}'...")
+                    click.echo(
+                        f"Squash merging changes from '{working_branch}' into '{release_branch}'..."
+                    )
                     # First ensure we have latest of both branches
-                    git_repo.git.fetch('origin', branch)
-                    git_repo.git.fetch('origin', original_branch)
-                    
+                    git_repo.git.fetch('origin', release_branch)
+                    git_repo.git.fetch('origin', working_branch)
+
                     # First, create a backup of the current branch in case something goes wrong
-                    backup_branch = f"backup-{original_branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    backup_branch = (
+                        f'backup-{working_branch}-{datetime.now().strftime("%Y%m%d%H%M%S")}'
+                    )
                     click.echo(f"Creating backup branch '{backup_branch}' of your current work")
                     git_repo.git.checkout('-b', backup_branch)
-                    git_repo.git.checkout(original_branch)
-                    
+                    git_repo.git.checkout(working_branch)
+
                     # Now check out the target branch and update it
-                    click.echo(f"Checking out target branch '{branch}'")
-                    git_repo.git.checkout(branch)
-                    
+                    click.echo(f"Checking out release branch '{release_branch}'")
+                    git_repo.git.checkout(release_branch)
+
                     # Pull latest from remote to make sure we're up to date
                     try:
-                        git_repo.git.pull('origin', branch)
+                        git_repo.git.pull('origin', release_branch)
                     except git.GitCommandError:
-                        click.echo(f"Could not pull latest changes for '{branch}', continuing with local version")
-                    
-                    # Squash merge the original branch into the target branch
-                    git_repo.git.merge(original_branch, '--squash')
-                    commit_msg = f"Squashed merge of '{original_branch}' into '{branch}' for release"
+                        msg = (
+                            f"Could not pull latest changes for '{release_branch}', "
+                            f'continuing with local version'
+                        )
+                    click.echo(msg)
+
+                    # Squash merge the working branch into the release branch
+                    git_repo.git.merge(working_branch, '--squash')
+                    commit_msg = (
+                        f"Squashed merge of '{working_branch}' into '{release_branch}' for release"
+                    )
                     git_repo.git.commit('-m', commit_msg)
-                    click.echo(f"Successfully squash merged changes from '{original_branch}' into '{branch}'")
-                    
+                    msg = (
+                        f"Successfully squash merged changes from '{working_branch}' "
+                        f"into '{release_branch}'"
+                    )
+                    click.echo(msg)
+
                     # Clean up the backup branch if the squash merge was successful
                     git_repo.git.branch('-D', backup_branch)
                     click.echo(f"Removed backup branch '{backup_branch}'")
-                    
+
                 # Record the branch we're on after merge strategy
                 current_branch = git_repo.active_branch.name
                 click.echo(f"Proceeding with release from branch '{current_branch}'")
             except git.GitCommandError as e:
                 click.echo(f"Error with merge strategy '{merge_strategy}': {str(e)}")
-                if not click.confirm(f"Continue release from current branch '{original_branch}'?"):
+                if not click.confirm(f"Continue release from current branch '{working_branch}'?"):
                     click.echo('Release canceled.')
                     sys.exit(0)
 
@@ -351,22 +466,22 @@ Released on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         click.echo(f'✓ Release v{new_version} completed successfully!')
 
         # Ask the user if they want to switch back to the original branch
-        if original_branch != git_repo.active_branch.name:
-            if click.confirm(f"Switch back to original branch '{original_branch}'?"):
+        if working_branch != git_repo.active_branch.name:
+            if click.confirm(f"Switch back to working branch '{working_branch}'?"):
                 try:
-                    git_repo.git.checkout(original_branch)
-                    click.echo(f"Switched back to branch '{original_branch}'")
+                    git_repo.git.checkout(working_branch)
+                    click.echo(f"Switched back to branch '{working_branch}'")
                 except git.GitCommandError as e:
-                    click.echo(f"Error switching back to branch '{original_branch}': {str(e)}")
+                    click.echo(f"Error switching back to branch '{working_branch}': {str(e)}")
 
     except Exception as e:
         click.echo(f'Error creating release: {str(e)}', err=True)
 
-        # Always try to restore the original branch in case of error
-        if 'original_branch' in locals() and original_branch != git_repo.active_branch.name:
+        # Always try to restore the working branch in case of error
+        if 'working_branch' in locals() and working_branch != git_repo.active_branch.name:
             try:
-                git_repo.git.checkout(original_branch)
-                click.echo(f"Restored original branch '{original_branch}' after error")
+                git_repo.git.checkout(working_branch)
+                click.echo(f"Restored working branch '{working_branch}' after error")
             except Exception:
                 pass  # Don't add more errors to the output
 

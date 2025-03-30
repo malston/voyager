@@ -1,9 +1,9 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
 
-from voyager.commands.list import list_group, releases, pipelines
+from voyager.commands.list import pipelines, releases
 
 
 @pytest.fixture

@@ -1,8 +1,5 @@
-import os
-import sys
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import MagicMock, patch
 
-import click
 import pytest
 from click.testing import CliRunner
 
@@ -155,7 +152,8 @@ def test_rollback_with_version_branch_update(mock_env_setup):
         # Mock click.confirm to return True for the confirmation prompts
         with patch('click.confirm', return_value=True):
             # Run rollback with version branch
-            result = runner.invoke(
+            # Note: We don't need to check the result, just the side effects
+            runner.invoke(
                 rollback, ['--tag', 'v0.9.0', '--version-branch', 'version'], catch_exceptions=True
             )
 
@@ -163,7 +161,8 @@ def test_rollback_with_version_branch_update(mock_env_setup):
             args, kwargs = mock_env_setup['version_updater'].call_args
             assert kwargs['branch'] == 'version'
 
-            # Since updater returned True (changes committed), git.add should not be called for version file
+            # Since updater returned True (changes committed),
+            # git.add should not be called for version file
             # But it should be called for other things like __init__.py
             mock_env_setup['repo_instance'].git.add.assert_not_called()
 

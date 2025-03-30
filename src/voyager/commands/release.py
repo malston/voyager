@@ -107,28 +107,56 @@ def create_release(
                     git_repo.git.checkout(branch)
                     click.echo(f"Switched to branch '{branch}'")
                 elif merge_strategy == 'rebase':
-                    # Rebase current branch onto target branch
-                    click.echo(f"Rebasing '{original_branch}' onto '{branch}'...")
-                    git_repo.git.checkout(branch)
+                    # Rebase target branch onto current working branch
+                    # This ensures commits from working branch are applied on top of the release branch
+                    click.echo(f"Rebasing '{branch}' onto '{original_branch}'...")
+                    # First ensure we have latest of both branches
+                    git_repo.git.fetch('origin', branch)
+                    git_repo.git.fetch('origin', original_branch)
+                    # Stay on original branch
                     git_repo.git.checkout(original_branch)
-                    git_repo.git.rebase(branch)
-                    click.echo(f"Rebased '{original_branch}' onto '{branch}'")
+                    # Create a temporary branch from the target branch to avoid
+                    # modifying remote branches directly
+                    temp_branch = f"temp-{branch}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    git_repo.git.checkout('-b', temp_branch, f"origin/{branch}")
+                    # Rebase the temp branch (from target) onto original branch
+                    git_repo.git.rebase(original_branch)
+                    # Now checkout the rebased temp branch for the release
+                    git_repo.git.checkout(temp_branch)
+                    click.echo(f"Created temporary branch '{temp_branch}' with '{branch}' rebased onto '{original_branch}'")
                 elif merge_strategy == 'merge':
-                    # Merge target branch into current branch
+                    # Merge target branch into current branch with temporary branch
                     click.echo(f"Merging '{branch}' into '{original_branch}'...")
-                    git_repo.git.checkout(branch)
+                    # First ensure we have latest of both branches
+                    git_repo.git.fetch('origin', branch)
+                    git_repo.git.fetch('origin', original_branch)
+                    # Stay on original branch
                     git_repo.git.checkout(original_branch)
-                    git_repo.git.merge(branch, '--no-ff')
-                    click.echo(f"Merged '{branch}' into '{original_branch}'")
+                    # Create a temporary branch to perform the merge
+                    temp_branch = f"temp-{original_branch}-merge-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    git_repo.git.checkout('-b', temp_branch)
+                    # Merge the target branch into the temp branch
+                    git_repo.git.merge(f"origin/{branch}", '--no-ff')
+                    # Stay on the temp branch for the release
+                    click.echo(f"Created temporary branch '{temp_branch}' with '{branch}' merged into '{original_branch}'")
                 elif merge_strategy == 'merge-squash':
-                    # Squash merge target branch into current branch
+                    # Squash merge target branch into current branch with temporary branch
                     click.echo(f"Squash merging '{branch}' into '{original_branch}'...")
-                    git_repo.git.checkout(branch)
+                    # First ensure we have latest of both branches
+                    git_repo.git.fetch('origin', branch)
+                    git_repo.git.fetch('origin', original_branch)
+                    # Stay on original branch
                     git_repo.git.checkout(original_branch)
-                    git_repo.git.merge(branch, '--squash')
+                    # Create a temporary branch to perform the squash merge
+                    temp_branch = f"temp-{original_branch}-squash-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    git_repo.git.checkout('-b', temp_branch)
+                    # Squash merge the target branch into the temp branch
+                    git_repo.git.merge(f"origin/{branch}", '--squash')
+                    # Create the squash commit
                     commit_msg = f"Squashed merge of '{branch}' into '{original_branch}' for release"
                     git_repo.git.commit('-m', commit_msg)
-                    click.echo(f"Squash merged '{branch}' into '{original_branch}'")
+                    # Stay on the temp branch for the release
+                    click.echo(f"Created temporary branch '{temp_branch}' with '{branch}' squash merged into '{original_branch}'")
                     
                 # Record the branch we're on after merge strategy
                 current_branch = git_repo.active_branch.name

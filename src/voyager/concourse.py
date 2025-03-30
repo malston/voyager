@@ -9,12 +9,12 @@ import requests
 import yaml
 
 
-def get_flyrc_data(team: str = None) -> Optional[Dict]:
+def get_flyrc_data(target: str = None) -> Optional[Dict]:
     """
     Read and parse the flyrc file.
 
     Args:
-        team: Optional team name to filter targets
+        target: Optional target name to filter data
 
     Returns:
         Dict containing the flyrc data, or None if file doesn't exist or can't be parsed
@@ -30,15 +30,10 @@ def get_flyrc_data(team: str = None) -> Optional[Dict]:
         if not flyrc_data or 'targets' not in flyrc_data:
             return None
 
-        if team:
-            # Filter to targets matching the team
-            matching_targets = {}
-            for target_name, target_data in flyrc_data.get('targets', {}).items():
-                if target_data.get('team') == team:
-                    matching_targets[target_name] = target_data
-
-            if matching_targets:
-                return {'targets': matching_targets}
+        if target:
+            # Get the specified target data if it exists
+            if target in flyrc_data.get('targets', {}):
+                return {'targets': {target: flyrc_data['targets'][target]}}
             return None
 
         return flyrc_data
@@ -47,88 +42,143 @@ def get_flyrc_data(team: str = None) -> Optional[Dict]:
         return None
 
 
-def get_token_from_flyrc(team: str) -> Optional[str]:
+def get_concourse_data_from_flyrc(target: str) -> Optional[Dict]:
     """
-    Extract Concourse token for a specific team from ~/.flyrc file.
+    Extract Concourse data for a specific target from ~/.flyrc file.
 
     Args:
-        team: The Concourse team name
+        target: The Concourse target name
+
+    Returns:
+        Dict containing team, api_url, and token if found, None otherwise
+    """
+    flyrc_data = get_flyrc_data(target)
+    if not flyrc_data or 'targets' not in flyrc_data or target not in flyrc_data['targets']:
+        return None
+
+    target_data = flyrc_data['targets'][target]
+
+    # Extract relevant information
+    result = {
+        'team': target_data.get('team'),
+        'api_url': target_data.get('api'),
+        'token': target_data.get('token', {}).get('value')
+    }
+
+    # Ensure we have the minimum required information
+    if not result['team'] or not result['api_url']:
+        return None
+
+    return result
+
+
+def get_token_from_flyrc(target: str) -> Optional[str]:
+    """
+    Extract Concourse token for a specific target from ~/.flyrc file.
+
+    Args:
+        target: The Concourse target name
 
     Returns:
         The token string if found, None otherwise
     """
-    flyrc_data = get_flyrc_data(team)
-    if not flyrc_data:
+    concourse_data = get_concourse_data_from_flyrc(target)
+    if not concourse_data:
         return None
 
-    # Look for the token in any matching target
-    for _target, target_data in flyrc_data.get('targets', {}).items():
-        token = target_data.get('token', {}).get('value')
-        if token:
-            return token
-
-    return None
+    return concourse_data.get('token')
 
 
-def get_api_url_from_flyrc(team: str) -> Optional[str]:
+def get_api_url_from_flyrc(target: str) -> Optional[str]:
     """
-    Extract Concourse API URL for a specific team from ~/.flyrc file.
+    Extract Concourse API URL for a specific target from ~/.flyrc file.
 
     Args:
-        team: The Concourse team name
+        target: The Concourse target name
 
     Returns:
         The API URL string if found, None otherwise
     """
-    flyrc_data = get_flyrc_data(team)
-    if not flyrc_data:
+    concourse_data = get_concourse_data_from_flyrc(target)
+    if not concourse_data:
         return None
 
-    # Look for the API URL in any matching target
-    for _target, target_data in flyrc_data.get('targets', {}).items():
-        api_url = target_data.get('api')
-        if api_url:
-            return api_url
+    return concourse_data.get('api_url')
 
-    return None
+
+def get_team_from_flyrc(target: str) -> Optional[str]:
+    """
+    Extract Concourse team name for a specific target from ~/.flyrc file.
+
+    Args:
+        target: The Concourse target name
+
+    Returns:
+        The team name if found, None otherwise
+    """
+    concourse_data = get_concourse_data_from_flyrc(target)
+    if not concourse_data:
+        return None
+
+    return concourse_data.get('team')
 
 
 class ConcourseClient:
     """Client for interacting with Concourse CI."""
 
-    def __init__(self, api_url: Optional[str], team: str, token: Optional[str] = None):
-        # Get the API URL in priority order:
-        # 1. Explicitly provided API URL
-        # 2. URL from ~/.flyrc file for the specified team
-        self.api_url = None
-        if api_url:
-            self.api_url = api_url.rstrip('/')
-        elif team:
-            flyrc_api_url = get_api_url_from_flyrc(team)
-            if flyrc_api_url:
-                self.api_url = flyrc_api_url.rstrip('/')
+    def __init__(self, api_url: Optional[str] = None, team: Optional[str] = None,
+                 token: Optional[str] = None, target: Optional[str] = None):
+        """
+        Initialize a Concourse client.
 
+        Args:
+            api_url: URL of the Concourse API (optional if target is provided)
+            team: Concourse team name (optional if target is provided)
+            token: Authentication token (optional if CONCOURSE_TOKEN env var or target is provided)
+            target: Name of the target in ~/.flyrc to use for authentication (optional)
+        """
+        # First, try to get info from target in ~/.flyrc if provided
+        target_team = None
+        if target:
+            target_api_url = get_api_url_from_flyrc(target)
+            target_team = get_team_from_flyrc(target)
+            target_token = get_token_from_flyrc(target)
+
+            # Use values from target if not explicitly provided
+            if not api_url and target_api_url:
+                api_url = target_api_url
+            if not team and target_team:
+                team = target_team
+            if not token and target_token:
+                token = target_token
+
+        # Validate API URL
+        self.api_url = api_url.rstrip('/') if api_url else None
         if not self.api_url:
             raise ValueError(
-                'Concourse API URL not found. Please provide it explicitly or ensure '
-                f'your ~/.flyrc file contains an API URL for the team "{team}".'
+                'Concourse API URL not found. Please provide it explicitly via --concourse-url'
+                ' or ensure your ~/.flyrc file contains a valid target with --concourse-target.'
             )
 
+        # Validate team
         self.team = team
+        if not self.team:
+            raise ValueError(
+                'Concourse team not found. Please provide it explicitly via --concourse-team'
+                ' or ensure your ~/.flyrc file contains a valid target with --concourse-target.'
+            )
 
         # Try to get token in priority order:
         # 1. Explicitly provided token
         # 2. CONCOURSE_TOKEN environment variable
-        # 3. Token from ~/.flyrc file for the specified team
+        # 3. Token from ~/.flyrc file for the specified target
         self.token = token or os.environ.get('CONCOURSE_TOKEN')
 
-        if not self.token and team:
-            self.token = get_token_from_flyrc(team)
         if not self.token:
             raise ValueError(
                 'Concourse token not found. Please set CONCOURSE_TOKEN environment variable, '
                 'provide it explicitly, or ensure your ~/.flyrc file contains credentials '
-                f'for the team "{team}".'
+                'for the target specified with --concourse-target.'
             )
 
         self.headers = {'Authorization': f'Bearer {self.token}', 'Content-Type': 'application/json'}

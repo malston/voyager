@@ -173,9 +173,11 @@ def create_release(
                         click.echo(
                             "⚠️ WARNING: Using 'checkout' strategy with a specified working branch"
                         )
-                        click.echo(
-                            f"Your commits from '{working_branch}' will NOT be merged into '{release_branch}'"
+                        msg = (
+                            f"Your commits from '{working_branch}' will NOT be merged "
+                            f"into '{release_branch}'"
                         )
+                        click.echo(msg)
                         if not click.confirm('Continue with checkout strategy?', default=False):
                             click.echo('Release canceled.')
                             sys.exit(0)

@@ -1,8 +1,5 @@
-import os
-import sys
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import MagicMock, call, patch
 
-import click
 import pytest
 from click.testing import CliRunner
 
@@ -254,7 +251,8 @@ def test_release_branch_with_squash_merge(mock_env_setup):
         # Check merge was called with --squash
         mock_env_setup['repo_instance'].git.merge.assert_called_with('main', '--squash')
 
-        # Verify commit was called with appropriate message - using any_call because we have other commits
+        # Verify commit was called with appropriate message
+        # Using any_call because we have other commits in the test
         mock_env_setup['repo_instance'].git.commit.assert_any_call(
             '-m', "Squashed merge of 'main' into 'develop' for release"
         )

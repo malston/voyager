@@ -1,17 +1,20 @@
 # Makefile for Voyager development
 
-.PHONY: setup venv install dev test lint format clean build publish activate security check-env help
+.PHONY: setup venv pyvenv install dev test lint format clean build publish activate security check-env help pip-install pip-dev
 
 PYTHON_VERSION ?= 3.13
 SRC_DIR = src/voyager
 TEST_DIR = tests
+# Package manager can be 'uv' or 'pip'
+PKG_MANAGER ?= uv
 
 # Default target when just running 'make'
 help:
 	@echo "Available commands:"
 	@echo "  make setup     - Set up development environment with mise"
 	@echo "  make venv      - Create a virtual environment using uv"
-	@echo "  make install   - Install dependencies and package in development mode"
+	@echo "  make install   - Install dependencies and package in development mode using $(PKG_MANAGER)"
+	@echo "  make pip-install - Install dependencies using pip instead of uv"
 	@echo "  make dev       - Complete development setup (venv + install)"
 	@echo "  make activate  - Show instructions to activate virtual environment"
 	@echo "  make test      - Run tests"
@@ -21,6 +24,8 @@ help:
 	@echo "  make build     - Build package distribution files"
 	@echo "  make publish   - Publish package to PyPI (requires credentials)"
 	@echo "  make check-env - Check if development environment is properly set up"
+	@echo "  make PKG_MANAGER=pip install - Use pip instead of uv for installation"
+	@echo "  make pip-dev    - Complete development setup using Python's venv and pip (no uv)"
 
 # Set up the development environment with mise and uv
 setup:
@@ -31,14 +36,14 @@ setup:
 		echo "You can install mise with:"; \
 		echo "  curl https://mise.run | sh"; \
 		echo ""; \
-		echo "Setup will continue, but you should install uv separately for best results."; \
+		echo "Setup will continue, but you should install mise separately for best results."; \
 	fi
 	@echo "Installing mise Python $(PYTHON_VERSION)..."
 	@mise install python
-	@echo "Checking for uv installation..."
-	@if command -v uv >/dev/null 2>&1; then \
-		echo "uv is already installed, using existing installation"; \
-	else \
+	@echo "Checking for $(PKG_MANAGER) installation..."
+	@if command -v $(PKG_MANAGER) >/dev/null 2>&1; then \
+		echo "$(PKG_MANAGER) is already installed, using existing installation"; \
+	elif [ "$(PKG_MANAGER)" = "uv" ]; then \
 		echo "uv not found, installing..."; \
 		echo "You can install uv with:"; \
 		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
@@ -47,28 +52,40 @@ setup:
 	fi
 	@echo "Setup complete. Next step: run 'make dev'"
 
-# Create a virtual environment using uv
+# Create a virtual environment using uv or python venv
 venv:
-	@echo "Creating virtual environment with uv..."
-	@if command -v uv >/dev/null 2>&1; then \
+	@echo "Creating virtual environment..."
+	@if [ "$(PKG_MANAGER)" = "uv" ] && command -v uv >/dev/null 2>&1; then \
 		uv venv; \
 	else \
-		echo "uv not found. Please install uv first:"; \
-		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
-		exit 1; \
+		python -m venv .venv; \
 	fi
+	@echo "Virtual environment created in .venv directory"
+
+# Create a virtual environment using standard Python venv (no uv dependency)
+pyvenv:
+	@echo "Creating virtual environment using Python's built-in venv module..."
+	@python -m venv .venv
 	@echo "Virtual environment created in .venv directory"
 
 # Install dependencies and the package in development mode
 install:
-	@echo "Installing development dependencies and package..."
-	@if ! command -v uv >/dev/null 2>&1; then \
-		echo "uv not found. Please install uv first:"; \
-		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
-		exit 1; \
+	@echo "Installing development dependencies and package using $(PKG_MANAGER)..."
+	@if [ "$(PKG_MANAGER)" = "uv" ] && command -v uv >/dev/null 2>&1; then \
+		uv pip install -e ".[dev]"; \
+	else \
+		. .venv/bin/activate && pip install -e ".[dev]"; \
 	fi
-	@uv pip install -e ".[dev]"
 	@echo "Installation complete"
+
+# Alternative target for pip installation
+pip-install:
+	@$(MAKE) PKG_MANAGER=pip install
+
+# Complete development setup with pip
+pip-dev:
+	@$(MAKE) pyvenv
+	@$(MAKE) pip-install
 
 # Complete development setup
 dev: venv install
@@ -169,10 +186,15 @@ check-env:
 		echo "✗ mise not found. Install with: curl https://mise.run | sh"; \
 		exit 1; \
 	fi
-	@if command -v uv >/dev/null 2>&1; then \
+	@if [ "$(PKG_MANAGER)" = "uv" ] && command -v uv >/dev/null 2>&1; then \
 		echo "✓ uv installed"; \
-	else \
+	elif [ "$(PKG_MANAGER)" = "pip" ] && command -v pip >/dev/null 2>&1; then \
+		echo "✓ pip installed"; \
+	elif [ "$(PKG_MANAGER)" = "uv" ]; then \
 		echo "✗ uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		exit 1; \
+	else \
+		echo "✗ pip not found. Check your Python installation"; \
 		exit 1; \
 	fi
 	@if [ -f "pyproject.toml" ]; then \

@@ -44,7 +44,7 @@ setup:
 		echo "You can install mise with:"; \
 		echo "  curl https://mise.run | sh"; \
 		echo ""; \
-		echo "Setup will continue, but you should install uv separately for best results."; \
+		echo "Setup will continue, but you should install mise separately for best results."; \
 	fi
 	@echo "Installing mise Python $(PYTHON_VERSION)..."
 	@mise install python

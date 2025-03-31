@@ -11,7 +11,7 @@ from voyager.github import GitHubClient
 
 
 class DemoReleasePipeline:
-    def __init__(self, foundation: str, repo: str, owner: str, branch: str, parms_repo: str, params_branch: str, release_tag: str, release_body: str, dry_run: bool = False):
+    def __init__(self, foundation: str, repo: str, owner: str, branch: str, params_repo: str, params_branch: str, release_tag: str, release_body: str, dry_run: bool = False):
         self.foundation = foundation
         self.branch = branch
         self.params_branch = params_branch
@@ -20,7 +20,7 @@ class DemoReleasePipeline:
         self.dry_run = dry_run
         self.owner = owner
         self.repo = repo
-        self.params_repo = parms_repo
+        self.params_repo = params_repo
         self.github_token = os.getenv('GITHUB_TOKEN')
         self.git_helper = GitHelper()
         self.github_client = GitHubClient()
@@ -343,6 +343,7 @@ def main():
         repo=args.repo,
         owner=args.owner,
         branch=args.branch,
+        params_repo=args.params_repo,
         params_branch=args.params_branch,
         release_tag=args.tag,
         release_body=args.message,

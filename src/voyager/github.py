@@ -26,6 +26,26 @@ class GitHubClient:
         if self.token:
             self.headers['Authorization'] = f'token {self.token}'
 
+    def get_latest_release(self, owner: str, repo: str) -> Dict:
+        """Get the latest release from GitHub API."""
+        url = f'https://api.github.com/repos/{owner}/{repo}/releases/latest'
+        response = requests.get(url, headers=self.headers)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            err_msg = f'Failed to get latest release: {response.status_code} - {response.text}'
+            raise Exception(err_msg)
+
+    def delete_release(self, owner: str, repo: str, release_id: int) -> bool:
+        """Delete a release by ID."""
+        url = f'https://api.github.com/repos/{owner}/{repo}/releases/{release_id}'
+        response = requests.delete(url, headers=self.headers)
+        if response.status_code == 204:
+            return True
+        self.error(f'Failed to delete release: {response.status_code} - {response.text}')
+        return False
+
     def create_release(
         self,
         owner: str,
@@ -54,22 +74,10 @@ class GitHubClient:
         else:
             raise Exception(f'Failed to create release: {response.status_code} - {response.text}')
 
-    def get_releases(self, owner: str, repo: str, per_page: int = 10) -> List[Dict]:
-        """Get releases for a repository."""
+    def get_releases(self, owner: str, repo: str) -> List[Dict]:
+        """Get all releases for a repository."""
         url = f'https://api.github.com/repos/{owner}/{repo}/releases'
-        params = {'per_page': per_page}
-
-        response = requests.get(url, headers=self.headers, params=params)
-
+        response = requests.get(url, headers=self.headers)
         if response.status_code == 200:
             return response.json()
-        else:
-            raise Exception(f'Failed to get releases: {response.status_code} - {response.text}')
-
-    def delete_release(self, owner: str, repo: str, release_id: int) -> bool:
-        """Delete a release by ID."""
-        url = f'https://api.github.com/repos/{owner}/{repo}/releases/{release_id}'
-
-        response = requests.delete(url, headers=self.headers)
-
-        return response.status_code == 204
+        raise Exception(f'Failed to get releases: {response.status_code} - {response.text}')

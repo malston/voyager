@@ -17,8 +17,8 @@ def pipeline_group():
 
 @pipeline_group.command('release', context_settings=CONTEXT_SETTINGS)
 @click.option('--foundation', required=True, help='Foundation name (e.g., cml-k8s-n-01)')
-@click.option('--repo', required=True, help='Repository name')
-@click.option('--message', '-m', help='Release message')
+@click.option('--repo', required=True, help='Repository name or path to repository CI directory')
+@click.option('--message', '-m', help='Release message describing the changes in this release')
 @click.pass_context
 def run_release_pipeline(ctx, foundation, repo, message):
     """Run the release pipeline for a repository."""
@@ -44,7 +44,7 @@ def run_release_pipeline(ctx, foundation, repo, message):
 
 @pipeline_group.command('set', context_settings=CONTEXT_SETTINGS)
 @click.option('--foundation', required=True, help='Foundation name (e.g., cml-k8s-n-01)')
-@click.option('--repo', required=True, help='Repository name')
+@click.option('--repo', required=True, help='Repository name or path to repository CI directory')
 @click.pass_context
 def run_set_pipeline(ctx, foundation, repo):
     """Run the set pipeline for a repository."""

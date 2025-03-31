@@ -335,8 +335,8 @@ def main():
     
     # Get latest release tag if not specified
     git_helper = GitHelper()
-    if not args.release:
-        args.release = git_helper.get_latest_release_tag()
+    if not args.tag:
+        args.tag = git_helper.get_latest_release_tag()
     
     pipeline = DemoReleasePipeline(
         foundation=args.foundation,

@@ -11,16 +11,16 @@ from voyager.github import GitHubClient
 
 
 class DemoReleasePipeline:
-    def __init__(self, foundation: str, branch: str, params_branch: str, release_tag: str, release_body: str, dry_run: bool = False):
+    def __init__(self, foundation: str, repo: str, owner: str, branch: str, parms_repo: str, params_branch: str, release_tag: str, release_body: str, dry_run: bool = False):
         self.foundation = foundation
         self.branch = branch
         self.params_branch = params_branch
         self.release_tag = release_tag
         self.release_body = release_body
         self.dry_run = dry_run
-        self.owner = os.getenv('USER')
-        self.repo = f"ns-mgmt-{self.owner}"
-        self.params_repo = f"params-{self.owner}"
+        self.owner = owner
+        self.repo = repo
+        self.params_repo = parms_repo
         self.github_token = os.getenv('GITHUB_TOKEN')
         self.git_helper = GitHelper()
         self.github_client = GitHubClient()
@@ -197,7 +197,7 @@ class DemoReleasePipeline:
             subprocess.run(['fly', '-t', 'tkgi-pipeline-upgrade', 'watch', '-j', f"{release_pipeline}/create-final-release"], check=True)
             input("Press enter to continue")
             
-            if not self.git_helper.update_git_release_tag(self.repo, self.params_repo, self.owner):
+            if not self.git_helper.update_git_release_tag(self.owner, self.repo, self.params_repo):
                 self.git_helper.error("Failed to update git release tag")
 
     def run_set_release_pipeline(self) -> None:
@@ -317,9 +317,12 @@ class DemoReleasePipeline:
 def main():
     parser = argparse.ArgumentParser(description='Demo release pipeline script')
     parser.add_argument('-f', '--foundation', required=True, help='the foundation name for ops manager (e.g. cml-k8s-n-01)')
+    parser.add_argument('-r', '--repo', required=True, help='the repo to use')
+    parser.add_argument('-o', '--owner', default=os.getenv('USER'), help='the repo owner to use')
     parser.add_argument('-b', '--branch', default=None, help='the branch to use')
+    parser.add_argument('-p', '--params-repo', default='params', help='the params repo to use')
     parser.add_argument('-d', '--params-branch', default='master', help='the params branch to use')
-    parser.add_argument('-r', '--release', default=None, help='the release tag')
+    parser.add_argument('-t', '--tag', default=None, help='the release tag')
     parser.add_argument('-m', '--message', default='', help='the message to apply to the release that is created')
     parser.add_argument('--dry-run', action='store_true', help='run in dry-run mode (no actual changes will be made)')
     
@@ -337,9 +340,11 @@ def main():
     
     pipeline = DemoReleasePipeline(
         foundation=args.foundation,
+        repo=args.repo,
+        owner=args.owner,
         branch=args.branch,
         params_branch=args.params_branch,
-        release_tag=args.release,
+        release_tag=args.tag,
         release_body=args.message,
         dry_run=args.dry_run
     )

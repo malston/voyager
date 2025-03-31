@@ -93,9 +93,9 @@ class GitHelper:
 
     def update_git_release_tag(
         self,
+        owner: str,
         repo: str,
         params_repo: str = 'params',
-        owner: str = 'malston',
     ) -> bool:
         """Update git release tags in the params repository."""
 

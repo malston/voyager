@@ -22,6 +22,9 @@ class GitHubClient:
         self.is_authenticated = bool(self.token)
         self.verifySSL = verifySSL
 
+        if not self.api_url:
+            api_url = 'https://api.github.com'
+
         if not self.token and required:
             raise ValueError(
                 'GitHub token not found. Please set GITHUB_TOKEN environment variable or '

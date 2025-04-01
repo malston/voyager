@@ -61,6 +61,9 @@ class DemoReleasePipeline:
         self.git_helper = GitHelper(repo_dir=self.repo_dir)
         self.release_helper = ReleaseHelper(repo=self.repo, owner=self.owner)
 
+        if not self.git_helper.check_git():
+            raise ValueError("Repository is not a git repository")
+
         if not self.github_token:
             raise ValueError("GITHUB_TOKEN env must be set before executing this script")
 

@@ -32,11 +32,14 @@ class ReleaseHelper:
         self.repo = repo
         self.owner = owner
         self.params_repo = params_repo
-        self.git_helper = GitHelper()
+        self.git_helper = GitHelper(repo=self.repo)
         self.github_client = GitHubClient()
         self.home = str(Path.home())
         self.repo_dir = os.path.join(self.home, "git", self.repo)
         self.params_dir = os.path.join(self.home, "git", self.params_repo)
+
+        if not self.git_helper.check_git():
+            raise ValueError("Repository is not a git repository")
 
     def get_latest_release_tag(self) -> str:
         """Get the latest release tag from git."""

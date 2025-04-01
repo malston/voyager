@@ -29,6 +29,16 @@ class GitHelper:
         """Print a success message."""
         print(f"\033[0;32m{message}\033[0m")
 
+    def check_git(self, repo: Optional[str] = None) -> bool | None:
+        """Check if repo is a git repository."""
+        repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
+        try:
+            subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=repo_dir, check=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            self.error(f"Failed to check if repo is a git repository: {e}")
+            return None
+
     def pull_all(self, repo: Optional[str] = None) -> None:
         """Pull all changes from all remotes."""
         repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)

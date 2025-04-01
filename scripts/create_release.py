@@ -84,7 +84,10 @@ def main() -> None:
     release_pipeline = f"tkgi-{repo}-release"
 
     # Initialize helpers
-    git_helper = GitHelper()
+    git_helper = GitHelper(repo=repo)
+    if not git_helper.check_git():
+        git_helper.error("Git is not installed or not in PATH")
+        return
     release_helper = ReleaseHelper(repo=repo, owner=args.owner, params_repo=args.params_repo)
 
     try:

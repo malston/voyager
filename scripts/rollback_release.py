@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -70,7 +71,8 @@ def main() -> None:
     repo = "ns-mgmt"
 
     # Initialize helpers
-    git_helper = GitHelper()
+    git_helper = GitHelper(repo=repo)
+    git_helper.check_git()
     release_helper = ReleaseHelper(repo=repo, params_repo=args.params_repo)
 
     try:

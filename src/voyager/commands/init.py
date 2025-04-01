@@ -11,126 +11,126 @@ from ..click_utils import CONTEXT_SETTINGS
 from ..utils import check_git_repo, get_repo_info
 
 
-@click.command('init', context_settings=CONTEXT_SETTINGS)
-@click.option('--concourse-url', metavar='URL', help='Concourse CI API URL')
-@click.option('--concourse-team', metavar='TEAM', help='Concourse CI team name')
-@click.option('--concourse-target', metavar='TARGET', help='Concourse target name from ~/.flyrc')
-@click.option('--pipeline', metavar='NAME', help='Concourse pipeline name')
+@click.command("init", context_settings=CONTEXT_SETTINGS)
+@click.option("--concourse-url", metavar="URL", help="Concourse CI API URL")
+@click.option("--concourse-team", metavar="TEAM", help="Concourse CI team name")
+@click.option("--concourse-target", metavar="TARGET", help="Concourse target name from ~/.flyrc")
+@click.option("--pipeline", metavar="NAME", help="Concourse pipeline name")
 @click.pass_context
 def init_repo(ctx, concourse_url, concourse_team, concourse_target, pipeline):
     """Initialize the current repository for Voyager."""
     if not check_git_repo():
-        click.echo('Error: Current directory is not a git repository', err=True)
+        click.echo("Error: Current directory is not a git repository", err=True)
         sys.exit(1)
 
     try:
         owner, repo = get_repo_info()
-        quiet = ctx.obj.get('quiet', False) if ctx.obj else False
+        quiet = ctx.obj.get("quiet", False) if ctx.obj else False
         if not quiet:
-            click.echo(f'Initializing Voyager for {owner}/{repo}...')
+            click.echo(f"Initializing Voyager for {owner}/{repo}...")
 
         # Create .github directory if it doesn't exist
-        github_dir = Path('.github')
+        github_dir = Path(".github")
         github_dir.mkdir(exist_ok=True)
 
         # Create ci directory if it doesn't exist
-        ci_dir = Path('ci')
+        ci_dir = Path("ci")
         ci_dir.mkdir(exist_ok=True)
 
         # Create workflows directory within .github if it doesn't exist
-        workflows_dir = github_dir / 'workflows'
+        workflows_dir = github_dir / "workflows"
         workflows_dir.mkdir(exist_ok=True)
 
         # Check if GitHub token is set
-        if not os.environ.get('GITHUB_TOKEN'):
-            click.echo('Warning: GITHUB_TOKEN environment variable is not set.')
+        if not os.environ.get("GITHUB_TOKEN"):
+            click.echo("Warning: GITHUB_TOKEN environment variable is not set.")
             click.echo(
-                'You will need to set this before using Voyager commands that interact with GitHub.'
+                "You will need to set this before using Voyager commands that interact with GitHub."
             )
 
         # Create GitHub Actions workflow file
-        workflow_file = workflows_dir / 'voyager.yml'
+        workflow_file = workflows_dir / "voyager.yml"
         if not workflow_file.exists() or click.confirm(
-            f'The file {workflow_file} already exists. Overwrite?'
+            f"The file {workflow_file} already exists. Overwrite?"
         ):
             create_github_workflow(workflow_file)
-            click.echo(f'✓ Created GitHub Actions workflow: {workflow_file}')
+            click.echo(f"✓ Created GitHub Actions workflow: {workflow_file}")
 
         # Copy and customize Concourse pipeline files
         if concourse_url and concourse_team:
-            pipeline_name = pipeline or 'release-pipeline'
+            pipeline_name = pipeline or "release-pipeline"
 
             # Copy pipeline.yml
-            pipeline_file = ci_dir / 'pipeline.yml'
+            pipeline_file = ci_dir / "pipeline.yml"
             if not pipeline_file.exists() or click.confirm(
-                f'The file {pipeline_file} already exists. Overwrite?'
+                f"The file {pipeline_file} already exists. Overwrite?"
             ):
                 create_concourse_pipeline(pipeline_file, owner, repo)
-                click.echo(f'✓ Created Concourse pipeline configuration: {pipeline_file}')
+                click.echo(f"✓ Created Concourse pipeline configuration: {pipeline_file}")
 
             # Create set-pipeline.sh script
-            set_pipeline_file = ci_dir / 'set-pipeline.sh'
+            set_pipeline_file = ci_dir / "set-pipeline.sh"
             if not set_pipeline_file.exists() or click.confirm(
-                f'The file {set_pipeline_file} already exists. Overwrite?'
+                f"The file {set_pipeline_file} already exists. Overwrite?"
             ):
                 create_set_pipeline_script(
                     set_pipeline_file, concourse_url, concourse_team, pipeline_name, owner, repo
                 )
                 os.chmod(set_pipeline_file, 0o755)  # Make executable
-                click.echo(f'✓ Created Concourse setup script: {set_pipeline_file}')
+                click.echo(f"✓ Created Concourse setup script: {set_pipeline_file}")
 
             # Check if Concourse token is set
-            if not os.environ.get('CONCOURSE_TOKEN'):
-                click.echo('Warning: CONCOURSE_TOKEN environment variable is not set.')
+            if not os.environ.get("CONCOURSE_TOKEN"):
+                click.echo("Warning: CONCOURSE_TOKEN environment variable is not set.")
                 click.echo(
-                    'You will need to set this before using Voyager commands '
-                    'that interact with Concourse CI.'
+                    "You will need to set this before using Voyager commands "
+                    "that interact with Concourse CI."
                 )
 
         # Create .env.example file
-        env_example_file = Path('.env.example')
+        env_example_file = Path(".env.example")
         if not env_example_file.exists() or click.confirm(
-            f'The file {env_example_file} already exists. Overwrite?'
+            f"The file {env_example_file} already exists. Overwrite?"
         ):
             create_env_example(env_example_file, concourse_url is not None)
-            click.echo(f'✓ Created environment variables example: {env_example_file}')
+            click.echo(f"✓ Created environment variables example: {env_example_file}")
 
         # Add .env to .gitignore if not already there
-        gitignore_file = Path('.gitignore')
+        gitignore_file = Path(".gitignore")
         if gitignore_file.exists():
-            with open(gitignore_file, 'r') as f:
+            with open(gitignore_file, "r") as f:
                 gitignore_content = f.read()
 
-            if '.env' not in gitignore_content:
-                with open(gitignore_file, 'a') as f:
-                    f.write('\n# Environment variables\n.env\n')
-                click.echo('✓ Added .env to .gitignore')
+            if ".env" not in gitignore_content:
+                with open(gitignore_file, "a") as f:
+                    f.write("\n# Environment variables\n.env\n")
+                click.echo("✓ Added .env to .gitignore")
 
         # Create voyager.yml configuration file
-        config_file = Path('voyager.yml')
+        config_file = Path("voyager.yml")
         if not config_file.exists() or click.confirm(
-            f'The file {config_file} already exists. Overwrite?'
+            f"The file {config_file} already exists. Overwrite?"
         ):
             create_voyager_config(
                 config_file, owner, repo, concourse_url, concourse_team, concourse_target, pipeline
             )
-            click.echo(f'✓ Created Voyager configuration: {config_file}')
+            click.echo(f"✓ Created Voyager configuration: {config_file}")
 
-        click.echo('\nVoyager initialized successfully!')
-        click.echo('\nNext steps:')
-        click.echo('1. Review the created configuration files and customize as needed.')
+        click.echo("\nVoyager initialized successfully!")
+        click.echo("\nNext steps:")
+        click.echo("1. Review the created configuration files and customize as needed.")
 
         if (concourse_url and concourse_team) or concourse_target:
-            click.echo('2. Set CONCOURSE_TOKEN env var (or use --concourse-target).')
-            click.echo('3. Run the pipeline setup script: ./ci/set-pipeline.sh')
+            click.echo("2. Set CONCOURSE_TOKEN env var (or use --concourse-target).")
+            click.echo("3. Run the pipeline setup script: ./ci/set-pipeline.sh")
 
         click.echo(
             "4. Set the GITHUB_TOKEN environment variable with a token that has 'repo' scope."
         )
-        click.echo('5. Try creating your first release: voyager release')
+        click.echo("5. Try creating your first release: voyager release")
 
     except Exception as e:
-        click.echo(f'Error initializing repository: {str(e)}', err=True)
+        click.echo(f"Error initializing repository: {str(e)}", err=True)
         sys.exit(1)
 
 
@@ -168,7 +168,7 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
 """
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         f.write(workflow_content)
 
 
@@ -259,7 +259,7 @@ jobs:
                   exit 0
                 fi
 """
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         f.write(pipeline_content)
 
 
@@ -297,7 +297,7 @@ fly -t $TEAM set-pipeline -p $PIPELINE -c ci/pipeline.yml \\
 
 echo "Pipeline setup complete."
 """
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         f.write(script_content)
 
 
@@ -315,7 +315,7 @@ CONCOURSE_TOKEN=your_concourse_token
 # CONCOURSE_TARGET=your_concourse_target
 """
 
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         f.write(env_content)
 
 
@@ -330,25 +330,25 @@ def create_voyager_config(
 ):
     """Create a voyager.yml configuration file."""
     config = {
-        'repository': {'owner': owner, 'name': repo, 'default_branch': 'main'},
-        'versioning': {'default_bump': 'patch'},
+        "repository": {"owner": owner, "name": repo, "default_branch": "main"},
+        "versioning": {"default_bump": "patch"},
     }
 
     # Can use either (concourse_url and concourse_team) or concourse_target
     if (concourse_url and concourse_team) or concourse_target:
-        config['concourse'] = {
-            'pipeline': pipeline or 'release-pipeline',
-            'release_job': 'build-and-release',
-            'rollback_job': 'rollback',
+        config["concourse"] = {
+            "pipeline": pipeline or "release-pipeline",
+            "release_job": "build-and-release",
+            "rollback_job": "rollback",
         }
 
         # Add URL and team if provided explicitly
         if concourse_url:
-            config['concourse']['url'] = concourse_url
+            config["concourse"]["url"] = concourse_url
         if concourse_team:
-            config['concourse']['team'] = concourse_team
+            config["concourse"]["team"] = concourse_team
         if concourse_target:
-            config['concourse']['target'] = concourse_target
+            config["concourse"]["target"] = concourse_target
 
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False)

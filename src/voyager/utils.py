@@ -12,16 +12,16 @@ def get_repo_info() -> Tuple[str, str]:
     try:
         repo = git.Repo(os.getcwd())
         for remote in repo.remotes:
-            if remote.name == 'origin':
+            if remote.name == "origin":
                 url = next(remote.urls)
                 # Handle SSH or HTTPS URL formats
-                match = re.search(r'github\.com[:/]([^/]+)/([^/.]+)', url)
+                match = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", url)
                 if match:
                     return match.group(1), match.group(2)
 
-        raise ValueError('Not a GitHub repository or missing origin remote')
+        raise ValueError("Not a GitHub repository or missing origin remote")
     except (git.InvalidGitRepositoryError, git.NoSuchPathError) as err:
-        raise ValueError('Current directory is not a git repository') from err
+        raise ValueError("Current directory is not a git repository") from err
 
 
 def check_git_repo() -> bool:

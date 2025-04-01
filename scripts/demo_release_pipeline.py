@@ -11,7 +11,19 @@ from voyager.github import GitHubClient
 
 
 class DemoReleasePipeline:
-   def __init__(self, foundation: str, repo: str, owner: str, branch: str, params_repo: str, params_branch: str, release_tag: str, release_body: str, dry_run: bool = False):
+   def __init__(
+       self,
+       foundation: str,
+       repo: str,
+       owner: str,
+       branch: str,
+       params_repo: str,
+       params_branch: str,
+       release_tag: str,
+       release_body: str,
+       dry_run: bool = False,
+       git_dir: str = None
+   ):
        self.foundation = foundation
        self.branch = branch
        self.params_branch = params_branch
@@ -27,6 +39,13 @@ class DemoReleasePipeline:
 
        if not self.github_token:
            raise ValueError("GITHUB_TOKEN env must be set before executing this script")
+           
+       # Store the repo directory path
+       if git_dir is None:
+           git_dir = os.path.expanduser("~/git")
+       self.repo_dir = os.path.join(git_dir, self.repo)
+       if not os.path.isdir(self.repo_dir):
+           raise ValueError(f"Could not find repo directory: {self.repo_dir}")
 
    def is_semantic_version(self, version: str) -> bool:
        """Check if a string is a valid semantic version number.
@@ -40,18 +59,27 @@ class DemoReleasePipeline:
        pattern = r'^\d+\.\d+\.\d+$'
        return bool(re.match(pattern, version))
 
-   def validate_git_tag(self, version: str) -> bool:
-       """Check if a git tag exists for the given version.
-
+   def run_git_command(self, command: list, **kwargs) -> subprocess.CompletedProcess:
+       """Run a git command in the repo directory.
+       
        Args:
-           version: The version to check
-
+           command: List of command arguments
+           **kwargs: Additional arguments to pass to subprocess.run
+           
        Returns:
-           bool: True if the tag exists, False otherwise
+           subprocess.CompletedProcess: The result of running the command
        """
+       if self.dry_run:
+           self.git_helper.info(f"[DRY RUN] Would run git command: {' '.join(command)}")
+           return None
+           
+       return subprocess.run(command, cwd=self.repo_dir, **kwargs)
+
+   def validate_git_tag(self, version: str) -> bool:
+       """Check if a git tag exists for the given version."""
        try:
            # Check if the tag exists
-           result = subprocess.run(
+           result = self.run_git_command(
                ['git', 'tag', '-l', f'release-v{version}'],
                check=True,
                capture_output=True,
@@ -127,7 +155,7 @@ class DemoReleasePipeline:
    def revert_version(self, previous_version: str) -> None:
        """Revert to a previous version."""
        self.git_helper.info(f"Reverting to version: {previous_version}")
-
+       
        if self.dry_run:
            self.git_helper.info(f"[DRY RUN] Would perform the following actions:")
            self.git_helper.info(f"1. Checkout and pull version branch")
@@ -135,28 +163,103 @@ class DemoReleasePipeline:
            self.git_helper.info(f"3. Commit and push changes")
            self.git_helper.info(f"4. Recreate release branch")
            return
+       
+       try:
+           # Change to version branch
+           self.run_git_command(['git', 'checkout', 'version'], check=True)
+           self.run_git_command(['git', 'pull', '-q', 'origin', 'version'], check=True)
+           
+           # Update version file
+           version_file = os.path.join(self.repo_dir, 'version')
+           with open(version_file, 'w') as f:
+               f.write(previous_version)
+           
+           # Commit changes
+           self.run_git_command(['git', 'add', '.'], check=True)
+           self.run_git_command(['git', 'commit', '-m', f"Revert version back to {previous_version} NOTICKET"], check=True)
+           self.run_git_command(['git', 'push', 'origin', 'version'], check=True)
+           
+           # Recreate release branch
+           self.run_git_command(['git', 'checkout', 'master'], check=True)
+           self.run_git_command(['git', 'pull', '-q', 'origin', 'version'], check=True)
+           self.run_git_command(['git', 'branch', '-D', 'release'], check=True)
+           self.run_git_command(['git', 'push', '--delete', 'origin', 'release'], check=True)
+           self.run_git_command(['git', 'checkout', '-b', 'release'], check=True)
+           self.run_git_command(['git', 'push', '-u', 'origin', 'release'], check=True)
+           
+       except subprocess.CalledProcessError as e:
+           self.git_helper.error(f"Git operation failed: {e.cmd}")
+           self.git_helper.error(f"Exit code: {e.returncode}")
+           if e.output:
+               self.git_helper.error(f"Output: {e.output.decode()}")
+           self.git_helper.error("Version reversion failed. Please check the git status and resolve any issues.")
+           return
+       except Exception as e:
+           self.git_helper.error(f"Unexpected error during version reversion: {str(e)}")
+           return
 
-       # Change to version branch
-       subprocess.run(['git', 'checkout', 'version'], check=True)
-       subprocess.run(['git', 'pull', '-q', 'origin', 'version'], check=True)
-
-       # Update version file
-       version_file = os.path.expanduser(f"~/git/{self.repo}/version")
-       with open(version_file, 'w') as f:
-           f.write(previous_version)
-
-       # Commit changes
-       subprocess.run(['git', 'add', '.'], check=True)
-       subprocess.run(['git', 'commit', '-m', f"Revert version back to {previous_version} NOTICKET"], check=True)
-       subprocess.run(['git', 'push', 'origin', 'version'], check=True)
-
-       # Recreate release branch
-       subprocess.run(['git', 'checkout', 'master'], check=True)
-       subprocess.run(['git', 'pull', '-q', 'origin', 'version'], check=True)
-       subprocess.run(['git', 'branch', '-D', 'release'], check=True)
-       subprocess.run(['git', 'push', '--delete', 'origin', 'release'], check=True)
-       subprocess.run(['git', 'checkout', '-b', 'release'], check=True)
-       subprocess.run(['git', 'push', '-u', 'origin', 'release'], check=True)
+   def run_fly_script(self, args: list) -> None:
+       """Run the fly.sh script in the repo's ci directory.
+       
+       Args:
+           args: List of arguments to pass to fly.sh
+       """
+       if self.dry_run:
+           self.git_helper.info(f"[DRY RUN] Would run fly.sh with args: {' '.join(args)}")
+           return
+            
+       ci_dir = os.path.join(self.repo_dir, 'ci')
+       if not os.path.isdir(ci_dir):
+           self.git_helper.error(f"CI directory not found at {ci_dir}")
+           return
+            
+       # Check for FLY_SCRIPT environment variable first
+       fly_script = os.getenv('FLY_SCRIPT')
+       if fly_script:
+           if not os.path.isabs(fly_script):
+               fly_script = os.path.join(ci_dir, fly_script)
+       else:
+           # Look for any script that starts with 'fly'
+           fly_scripts = []
+           for item in os.listdir(ci_dir):
+               if item.startswith('fly'):
+                   script_path = os.path.join(ci_dir, item)
+                   if os.path.isfile(script_path):
+                       fly_scripts.append(script_path)
+                    
+           if not fly_scripts:
+               self.git_helper.error(f"No fly script found in {ci_dir}")
+               return
+                
+           if len(fly_scripts) == 1:
+               fly_script = fly_scripts[0]
+           else:
+               self.git_helper.info("Multiple fly scripts found. Please choose one:")
+               for i, script in enumerate(fly_scripts, 1):
+                   self.git_helper.info(f"{i}. {os.path.basename(script)}")
+                    
+               while True:
+                   try:
+                       choice = int(input("Enter the number of the script to use: "))
+                       if 1 <= choice <= len(fly_scripts):
+                           fly_script = fly_scripts[choice - 1]
+                           break
+                       self.git_helper.error(f"Please enter a number between 1 and {len(fly_scripts)}")
+                   except ValueError:
+                       self.git_helper.error("Please enter a valid number")
+            
+       if not os.access(fly_script, os.X_OK):
+           self.git_helper.error(f"Fly script at {fly_script} is not executable")
+           return
+            
+       try:
+           subprocess.run([fly_script] + args, cwd=ci_dir, check=True)
+       except subprocess.CalledProcessError as e:
+           self.git_helper.error(f"Fly script failed: {e.cmd}")
+           self.git_helper.error(f"Exit code: {e.returncode}")
+           if e.output:
+               self.git_helper.error(f"Output: {e.output.decode()}")
+           raise
 
    def run_release_pipeline(self) -> None:
        """Run the release pipeline."""
@@ -180,14 +283,12 @@ class DemoReleasePipeline:
            subprocess.run(['fly', '-t', 'tkgi-pipeline-upgrade', 'dp', '-p', release_pipeline, '-n'], check=True)
 
        # Run fly.sh script
-       cmd = [
-           './fly.sh',
+       self.run_fly_script([
            '-f', self.foundation,
            '-r', self.release_body,
            '-o', self.owner,
            '-p', release_pipeline
-       ]
-       subprocess.run(cmd, check=True)
+       ])
 
        # Run pipeline if requested
        response = input(f"Do you want to run the {release_pipeline} pipeline? [yN] ")
@@ -222,16 +323,14 @@ class DemoReleasePipeline:
 
        response = input(f"Do you want to run the {set_release_pipeline} pipeline? [yN] ")
        if response.lower().startswith('y'):
-           cmd = [
-               './fly.sh',
+           self.run_fly_script([
                '-f', self.foundation,
                '-s', set_release_pipeline,
                '-b', self.branch,
                '-d', self.params_branch,
                '-o', self.owner,
                '-p', mgmt_pipeline
-           ]
-           subprocess.run(cmd, check=True)
+           ])
 
            subprocess.run(['fly', '-t', self.foundation, 'unpause-pipeline', '-p', set_release_pipeline], check=True)
            subprocess.run(['fly', '-t', self.foundation, 'trigger-job', '-j', f"{set_release_pipeline}/set-release-pipeline", '-w'], check=True)
@@ -247,13 +346,11 @@ class DemoReleasePipeline:
 
        response = input(f"Do you want to refly the {self.repo} pipeline back to latest code on branch: {self.branch}? [yN] ")
        if response.lower().startswith('y'):
-           cmd = [
-               './fly.sh',
+           self.run_fly_script([
                '-f', self.foundation,
                '-b', self.branch,
                '-p', mgmt_pipeline
-           ]
-           subprocess.run(cmd, check=True)
+           ])
 
            response = input(f"Do you want to rerun the {mgmt_pipeline} pipeline? [yN] ")
            if response.lower().startswith('y'):
@@ -270,21 +367,32 @@ class DemoReleasePipeline:
            self.git_helper.info("4. If yes, validate and prompt for previous version")
            self.git_helper.info("5. If valid, revert to the specified version")
            return
+            
+       try:
+           # Check current version
+           self.run_git_command(['git', 'checkout', 'version'], check=True)
+           self.run_git_command(['git', 'pull', '-q', 'origin', 'version'], check=True)
+       except subprocess.CalledProcessError as e:
+           self.git_helper.error(f"Git operation failed: {e.cmd}")
+           self.git_helper.error(f"Exit code: {e.returncode}")
+           if e.output:
+               self.git_helper.error(f"Output: {e.output.decode()}")
+           return
+        
+       version_file = os.path.join(self.repo_dir, 'version')
+       if not os.path.exists(version_file):
+           self.git_helper.error(f"Version file not found at {version_file}")
+           return
 
-       # Check current version
-       subprocess.run(['git', 'checkout', 'version'], check=True)
-       subprocess.run(['git', 'pull', '-q', 'origin', 'version'], check=True)
-
-       version_file = os.path.expanduser(f"~/git/{self.repo}/version")
        try:
            with open(version_file, 'r') as f:
                current_version = f.read().strip()
-       except FileNotFoundError:
-           self.git_helper.error(f"Could not find a version in {version_file}")
+       except Exception as e:
+           self.git_helper.error(f"Error reading version file: {str(e)}")
            return
 
        self.git_helper.info(f"The current version is: {current_version}")
-
+        
        # Handle version reversion if requested
        response = input("Do you want to revert to an older version? [yN] ")
        if response.lower().startswith('y'):
@@ -325,6 +433,7 @@ def main():
    parser.add_argument('-t', '--tag', default=None, help='the release tag')
    parser.add_argument('-m', '--message', default='', help='the message to apply to the release that is created')
    parser.add_argument('--dry-run', action='store_true', help='run in dry-run mode (no actual changes will be made)')
+   parser.add_argument('--git-dir', default=None, help='the base directory containing git repositories (default: ~/git)')
 
    args = parser.parse_args()
 
@@ -347,7 +456,8 @@ def main():
        params_branch=args.params_branch,
        release_tag=args.tag,
        release_body=args.message,
-       dry_run=args.dry_run
+       dry_run=args.dry_run,
+       git_dir=args.git_dir
    )
 
    pipeline.run()

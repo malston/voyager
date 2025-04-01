@@ -5,62 +5,6 @@ import subprocess
 from typing import List, Optional
 
 
-class GitHubClient:
-    """Client for GitHub operations."""
-
-    def __init__(self, owner: str):
-        self.owner = owner
-        self.token = os.getenv('GITHUB_TOKEN')
-        if not self.token:
-            raise ValueError('GITHUB_TOKEN environment variable must be set')
-
-    def delete_release(self, release_tag: str) -> None:
-        """Delete a GitHub release and its tag."""
-        try:
-            # Get release ID
-            result = subprocess.run(
-                [
-                    'curl',
-                    '-sL',
-                    '-H',
-                    'Accept: application/vnd.github+json',
-                    '-H',
-                    f'Authorization: Bearer {self.token}',
-                    '-H',
-                    'X-GitHub-Api-Version: 2022-11-28',
-                    f'https://github.com/api/v3/repos/{self.owner}/{self.repo}/releases/latest',
-                ],
-                check=True,
-                text=True,
-                capture_output=True,
-            )
-            release_id = result.stdout.strip()
-            if not release_id:
-                raise ValueError(
-                    f'Release tag: {release_tag} not found in releases at github.com/{self.owner}'
-                )
-
-            # Delete release
-            subprocess.run(
-                [
-                    'curl',
-                    '-L',
-                    '-X',
-                    'DELETE',
-                    '-H',
-                    'Accept: application/vnd.github+json',
-                    '-H',
-                    f'Authorization: Bearer {self.token}',
-                    '-H',
-                    'X-GitHub-Api-Version: 2022-11-28',
-                    f'https://github.com/api/v3/repos/{self.owner}/{self.repo}/releases/{release_id}',
-                ],
-                check=True,
-            )
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f'Failed to delete GitHub release: {e}') from e
-
-
 class GitHelper:
     """Helper class for git operations used in release pipeline scripts."""
 

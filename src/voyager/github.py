@@ -96,6 +96,8 @@ class GitHubClient:
 
         Raises:
             requests.exceptions.HTTPError: If the API request fails
+            requests.exceptions.Timeout: If the request times out
+            requests.exceptions.ConnectionError: If there's a connection error
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases"
         params = {"per_page": per_page}
@@ -115,14 +117,23 @@ class GitHubClient:
             owner: Repository owner
             repo: Repository name
             tag_name: Tag name of the release
+
         Returns:
             Dict containing release information if found, None otherwise
+
+        Raises:
+            requests.exceptions.HTTPError: If the API request fails
+            requests.exceptions.Timeout: If the request times out
+            requests.exceptions.ConnectionError: If there's a connection error
         """
-        releases = self.get_releases(owner, repo)
-        for release in releases:
-            if release.get("tag_name") == tag_name:
-                return release
-        return None
+        try:
+            releases = self.get_releases(owner, repo)
+            for release in releases:
+                if release.get("tag_name") == tag_name:
+                    return release
+            return None
+        except requests.exceptions.RequestException as e:
+            raise requests.exceptions.RequestException(f"Failed to find release by tag: {str(e)}")
 
     def delete_release(self, owner: str, repo: str, release_id: int) -> None:
         """Delete a release by ID.

@@ -4,10 +4,26 @@ import argparse
 import os
 import re
 import subprocess
+import sys
 from typing import Optional, Tuple
-
-from voyager.git import GitHelper
+from pathlib import Path
 from voyager.github import GitHubClient
+
+# Add the project root to the Python path
+project_root = str(Path(__file__).parent.parent)
+sys.path.insert(0, project_root)
+
+from scripts.git_helper import GitHelper
+
+
+class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    def format_help(self):
+        help_text = super().format_help()
+        # Remove the default options section
+        help_text = help_text.split('\n\n')[0] + '\n\n' + help_text.split('\n\n')[-1]
+        # Change "usage:" to "Usage:"
+        help_text = help_text.replace('usage:', 'Usage:')
+        return help_text
 
 
 class DemoReleasePipeline:
@@ -542,9 +558,15 @@ class DemoReleasePipeline:
     def run(self) -> None:
         """Run the complete demo release pipeline."""
         # Check for uncommitted changes
-        result = self.run_git_command(['git', 'status', '--porcelain'], dry_run=False, check=True, capture_output=True, text=True)
+        result = self.run_git_command(
+            ['git', 'status', '--porcelain'],
+            dry_run=False,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         if result.stdout.strip():
-            self.git_helper.error("Please commit or stash your changes before running this script")
+            self.git_helper.error('Please commit or stash your changes before running this script')
             return
 
         # Get current branch if not specified
@@ -588,31 +610,55 @@ class DemoReleasePipeline:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Demo release pipeline script')
+    parser = argparse.ArgumentParser(
+        prog='demo_release_pipeline.py',
+        description='Demo release pipeline script',
+        formatter_class=CustomHelpFormatter,
+        add_help=False,
+        usage='%(prog)s -f foundation -r repo [-o owner] [-b branch] [-p params_repo] [-d params_branch] [-t tag] [-m message] [--dry-run] [--git-dir dir] [-h]',
+        epilog="""
+Options:
+   -f foundation     the foundation name for ops manager (e.g. cml-k8s-n-01)
+   -r repo           the repo to use
+   -o owner          the repo owner to use (default: current user)
+   -b branch         the branch to use (default: current branch)
+   -p params_repo    the params repo to use (default: params)
+   -d params_branch  the params branch to use (default: master)
+   -t tag            the release tag (default: latest)
+   -m message        the message to apply to the release that is created
+   --dry-run         run in dry-run mode (no actual changes will be made)
+   --git-dir dir     the base directory containing git repositories (default: ~/git)
+   -h                display usage
+""",
+    )
     parser.add_argument(
         '-f',
         '--foundation',
         required=True,
-        help='the foundation name for ops manager (e.g. cml-k8s-n-01)',
+        help=argparse.SUPPRESS,
     )
-    parser.add_argument('-r', '--repo', required=True, help='the repo to use')
-    parser.add_argument('-o', '--owner', default=os.getenv('USER'), help='the repo owner to use')
-    parser.add_argument('-b', '--branch', default=None, help='the branch to use')
-    parser.add_argument('-p', '--params-repo', default='params', help='the params repo to use')
-    parser.add_argument('-d', '--params-branch', default='master', help='the params branch to use')
-    parser.add_argument('-t', '--tag', default=None, help='the release tag')
-    parser.add_argument(
-        '-m', '--message', default='', help='the message to apply to the release that is created'
-    )
+    parser.add_argument('-r', '--repo', required=True, help=argparse.SUPPRESS)
+    parser.add_argument('-o', '--owner', default=os.getenv('USER'), help=argparse.SUPPRESS)
+    parser.add_argument('-b', '--branch', default=None, help=argparse.SUPPRESS)
+    parser.add_argument('-p', '--params-repo', default='params', help=argparse.SUPPRESS)
+    parser.add_argument('-d', '--params-branch', default='master', help=argparse.SUPPRESS)
+    parser.add_argument('-t', '--tag', default=None, help=argparse.SUPPRESS)
+    parser.add_argument('-m', '--message', default='', help=argparse.SUPPRESS)
     parser.add_argument(
         '--dry-run',
         action='store_true',
-        help='run in dry-run mode (no actual changes will be made)',
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         '--git-dir',
         default=None,
-        help='the base directory containing git repositories (default: ~/git)',
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        '-h',
+        '--help',
+        action='help',
+        help='display usage',
     )
 
     args = parser.parse_args()

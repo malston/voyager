@@ -64,13 +64,16 @@ class DemoReleasePipeline:
         self.github_token = os.getenv("GITHUB_TOKEN")
         if self.owner != "Utilities-tkgieng":
             self.git_helper = GitHelper(repo=f"{repo}-{owner}")
+            self.release_helper = ReleaseHelper(
+                repo=self.repo, owner=self.owner, params_repo=f"{self.params_repo}-{self.owner}"
+            )
         else:
-            self.git_helper = GitHelper(repo=repo)
-        self.release_helper = ReleaseHelper(
-            repo=self.repo, owner=self.owner, params_repo=params_repo
-        )
+            self.git_helper = GitHelper(repo=self.repo)
+            self.release_helper = ReleaseHelper(
+                repo=self.repo, owner=self.owner, params_repo=self.params_repo
+            )
 
-        if not self.git_helper.check_git():
+        if not self.git_helper.check_git_repo():
             raise ValueError("Repository is not a git repository")
 
         if not self.github_token:

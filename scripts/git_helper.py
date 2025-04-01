@@ -2,7 +2,11 @@
 
 import os
 import subprocess
+import re
 from typing import List, Optional
+from typing import Tuple
+
+import git
 
 
 class GitHelper:
@@ -29,15 +33,31 @@ class GitHelper:
         """Print a success message."""
         print(f"\033[0;32m{message}\033[0m")
 
-    def check_git(self, repo: Optional[str] = None) -> bool | None:
+    def get_repo_info(self, repo: Optional[str] = None) -> Tuple[str, str]:
+        """Extract owner and repo name from git remote URL."""
+        repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
+        try:
+            repo = git.Repo(repo_dir)
+            for remote in repo.remotes:
+                if remote.name == "origin":
+                    url = next(remote.urls)
+                    # Handle SSH or HTTPS URL formats
+                    match = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", url)
+                    if match:
+                        return match.group(1), match.group(2)
+
+            raise ValueError("Not a GitHub repository or missing origin remote")
+        except (git.InvalidGitRepositoryError, git.NoSuchPathError) as err:
+            raise ValueError("Current directory is not a git repository") from err
+
+    def check_git_repo(self, repo: Optional[str] = None) -> bool | None:
         """Check if repo is a git repository."""
         repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
         try:
-            subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=repo_dir, check=True)
+            git.Repo(repo_dir)
             return True
-        except subprocess.CalledProcessError as e:
-            self.error(f"Failed to check if repo is a git repository: {e}")
-            return None
+        except (git.InvalidGitRepositoryError, git.NoSuchPathError):
+            return False
 
     def pull_all(self, repo: Optional[str] = None) -> None:
         """Pull all changes from all remotes."""

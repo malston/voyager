@@ -82,17 +82,19 @@ def main() -> None:
     args = parse_args()
     repo = "ns-mgmt"
     release_pipeline = f"tkgi-{repo}-release"
+    params_repo = args.params_repo
 
     if args.owner != "Utilities-tkgieng":
         repo = f"{repo}-{args.owner}"
+        params_repo = f"{args.params_repo}-{args.owner}"
         release_pipeline = f"tkgi-{repo}-release"
 
     # Initialize helpers
     git_helper = GitHelper(repo=repo)
-    if not git_helper.check_git():
+    if not git_helper.check_git_repo():
         git_helper.error("Git is not installed or not in PATH")
         return
-    release_helper = ReleaseHelper(repo=repo, owner=args.owner, params_repo=args.params_repo)
+    release_helper = ReleaseHelper(repo=repo, owner=args.owner, params_repo=params_repo)
 
     try:
         # Change to the repo's ci directory

@@ -69,14 +69,16 @@ Options:
 def main() -> None:
     args = parse_args()
     repo = "ns-mgmt"
+    params_repo = args.params_repo
 
     if args.owner != "Utilities-tkgieng":
         repo = f"{repo}-{args.owner}"
+        params_repo = f"{args.params_repo}-{args.owner}"
 
     # Initialize helpers
     git_helper = GitHelper(repo=repo)
-    git_helper.check_git()
-    release_helper = ReleaseHelper(repo=repo, params_repo=args.params_repo)
+    git_helper.check_git_repo()
+    release_helper = ReleaseHelper(repo=repo, owner=args.owner, params_repo=params_repo)
 
     try:
         # Change to the repo's ci directory

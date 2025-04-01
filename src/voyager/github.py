@@ -45,7 +45,6 @@ class GitHubClient:
             # Example: https://github.example.com/api/v3
             self.api_url = "https://api.github.com"
 
-        print(f"Using GitHub API URL: {self.api_url}")
         if not self.token and required:
             raise ValueError(
                 "GitHub token not found. Please set GITHUB_TOKEN environment variable or "

@@ -32,19 +32,13 @@ class ReleaseHelper:
         self.repo = repo
         self.owner = owner
         self.params_repo = params_repo
-        if self.owner != "Utilities-tkgieng":
-            self.git_helper = GitHelper(repo=f"{repo}-{owner}")
-            if self.params_repo == "params":
-                self.params_repo = f"{params_repo}-{owner}"
-        else:
-            self.git_helper = GitHelper(repo=repo)
-
+        self.git_helper = GitHelper(repo=repo)
         self.github_client = GitHubClient()
         self.home = str(Path.home())
         self.repo_dir = os.path.join(self.home, "git", self.repo)
         self.params_dir = os.path.join(self.home, "git", self.params_repo)
 
-        if not self.git_helper.check_git():
+        if not self.git_helper.check_git_repo():
             raise ValueError("Repository is not a git repository")
 
     def get_latest_release_tag(self) -> str:

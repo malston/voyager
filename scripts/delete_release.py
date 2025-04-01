@@ -94,8 +94,8 @@ def main() -> None:
 
     # Initialize helpers
     git_helper = GitHelper(repo=repo)
-    if not git_helper.check_git():
-        git_helper.error("Git is not installed or not in PATH")
+    if not git_helper.check_git_repo():
+        git_helper.error(f"{repo} is not a git repository")
         return
     release_helper = ReleaseHelper(repo=repo, owner=args.owner)
 

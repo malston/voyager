@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 import os
-import urllib3
 from typing import Dict, List, Optional
 
 import requests
+import urllib3
 
 
 class GitHubClient:

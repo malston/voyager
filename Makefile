@@ -108,7 +108,7 @@ activate:
 lint:
 	@echo "Running linting checks..."
 	@if [ -d ".venv" ]; then \
-		. .venv/bin/activate && ruff check $(SRC_DIR) $(TEST_DIR); \
+		. .venv/bin/activate && ruff check $(SRC_DIR) $(TEST_DIR) --fix; \
 	else \
 		echo "Virtual environment not found. Please run 'make venv' first."; \
 		exit 1; \

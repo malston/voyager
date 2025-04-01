@@ -6,8 +6,9 @@ import subprocess
 import argparse
 from typing import Optional, List, Tuple
 from pathlib import Path
+from voyager.github import GitHubClient
 
-from .git_helper import GitHelper, GitHubClient
+from .git_helper import GitHelper
 
 
 class ReleaseHelper:

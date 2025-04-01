@@ -58,8 +58,11 @@ class DemoReleasePipeline:
             raise ValueError(f"Could not find repo directory: {self.repo_dir}")
 
         self.github_token = os.getenv("GITHUB_TOKEN")
-        self.git_helper = GitHelper(repo_dir=self.repo_dir)
-        self.release_helper = ReleaseHelper(repo=self.repo, owner=self.owner)
+        if self.owner != "Utilities-tkgieng":
+            self.git_helper = GitHelper(repo=f"{repo}-{owner}")
+        else:
+            self.git_helper = GitHelper(repo=repo)
+        self.release_helper = ReleaseHelper(repo=self.repo, owner=self.owner, params_repo=params_repo)
 
         if not self.git_helper.check_git():
             raise ValueError("Repository is not a git repository")
@@ -339,7 +342,8 @@ class DemoReleasePipeline:
 
     def run_release_pipeline(self) -> None:
         """Run the release pipeline."""
-        release_pipeline = f"tkgi-{self.repo}-release"
+        if self.owner != "Utilities-tkgieng":
+            release_pipeline = f"tkgi-{self.repo}-{self.owner}-release"
 
         if self.dry_run:
             self.git_helper.info(f"[DRY RUN] Would perform the following actions:")
@@ -406,14 +410,14 @@ class DemoReleasePipeline:
             )
             input("Press enter to continue")
 
-            if not self.git_helper.update_params_git_release_tag(
-                self.owner, self.repo, self.params_repo
-            ):
+            if not self.release_helper.update_params_git_release_tag():
                 self.git_helper.error("Failed to update git release tag")
 
     def run_set_release_pipeline(self) -> None:
         """Run the set release pipeline."""
         mgmt_pipeline = f"tkgi-{self.repo}-{self.foundation}"
+        if self.owner != "Utilities-tkgieng":
+            mgmt_pipeline = f"tkgi-{self.repo}-{self.owner}-{self.foundation}"
         set_release_pipeline = f"{mgmt_pipeline}-set-release-pipeline"
 
         if self.dry_run:

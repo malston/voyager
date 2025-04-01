@@ -121,16 +121,16 @@ class GitHelper:
                 for file in files:
                     if file.endswith(f"-{repo}.yml") or file.endswith(f".{repo}.yaml"):
                         file_path = os.path.join(root, file)
-                        with open(file_path, "r") as f:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             content = f.read()
                         if f"git_release_tag: release-{from_version}" in content:
                             new_content = content.replace(
                                 f"git_release_tag: release-{from_version}",
                                 f"git_release_tag: release-{to_version}",
                             )
-                            with open(file_path, "w") as f:
+                            with open(file_path, "w", encoding="utf-8") as f:
                                 f.write(new_content)
-        except Exception as e:
+        except (IOError, OSError, PermissionError) as e:
             self.error(f"Failed to update release tag in params: {e}")
 
     def create_and_merge_branch(self, repo: str, branch_name: str, commit_message: str) -> bool:

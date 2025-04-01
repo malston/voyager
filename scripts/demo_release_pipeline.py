@@ -17,6 +17,8 @@ from scripts.release_helper import ReleaseHelper
 
 
 class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Custom help formatter to modify the help output."""
+
     def format_help(self):
         help_text = super().format_help()
         # Remove the default options section
@@ -27,6 +29,8 @@ class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
 
 class DemoReleasePipeline:
+    """Class to handle the demo release pipeline."""
+
     def __init__(
         self,
         foundation: str,
@@ -62,7 +66,9 @@ class DemoReleasePipeline:
             self.git_helper = GitHelper(repo=f"{repo}-{owner}")
         else:
             self.git_helper = GitHelper(repo=repo)
-        self.release_helper = ReleaseHelper(repo=self.repo, owner=self.owner, params_repo=params_repo)
+        self.release_helper = ReleaseHelper(
+            repo=self.repo, owner=self.owner, params_repo=params_repo
+        )
 
         if not self.git_helper.check_git():
             raise ValueError("Repository is not a git repository")
@@ -408,10 +414,6 @@ class DemoReleasePipeline:
                 ],
                 check=True,
             )
-            input("Press enter to continue")
-
-            if not self.release_helper.update_params_git_release_tag():
-                self.git_helper.error("Failed to update git release tag")
 
     def run_set_release_pipeline(self) -> None:
         """Run the set release pipeline."""
@@ -493,9 +495,11 @@ class DemoReleasePipeline:
     def refly_pipeline(self) -> None:
         """Refly the pipeline back to latest code."""
         mgmt_pipeline = f"tkgi-{self.repo}-{self.foundation}"
+        if self.owner != "Utilities-tkgieng":
+            mgmt_pipeline = f"tkgi-{self.repo}-{self.owner}-{self.foundation}"
 
         response = input(
-            f"Do you want to refly the {self.repo} pipeline back to latest code on branch: {self.branch}? [yN] "
+            f"Do you want to refly the {mgmt_pipeline} pipeline back to latest code on branch: {self.branch}? [yN] "
         )
         if response.lower().startswith("y"):
             self.run_fly_script(["-f", self.foundation, "-b", self.branch, "-p", mgmt_pipeline])
@@ -618,11 +622,24 @@ class DemoReleasePipeline:
 
         # Run the pipeline steps
         self.run_release_pipeline()
+
+        input("Press enter to continue")
+
+        if not self.release_helper.update_params_git_release_tag():
+            self.git_helper.error("Failed to update git release tag")
+            response = input(
+                "Failed to update params git release tag. Do you want to continue anyway? [yN] "
+            )
+            if not response.lower().startswith("y"):
+                self.git_helper.info("Exiting the pipeline process.")
+                sys.exit(1)
+
         self.run_set_release_pipeline()
         self.refly_pipeline()
 
 
 def main():
+    """Main function to parse arguments and run the demo release pipeline."""
     parser = argparse.ArgumentParser(
         prog="demo_release_pipeline.py",
         description="Demo release pipeline script",

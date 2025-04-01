@@ -201,12 +201,31 @@ class ReleaseHelper:
             to_version = f"v{current_version}"
 
             # Update files
-            self.git_helper.update_release_tag_in_params(
-                self.params_repo, self.repo, from_version, to_version
-            )
+            try:
+                self.git_helper.update_release_tag_in_params(
+                    self.params_repo, self.repo, from_version, to_version
+                )
+            except (IOError, OSError, subprocess.SubprocessError) as e:
+                self.git_helper.error(f"Failed to update release tag in params: {e}")
+                return False
 
             if not self.git_helper.confirm("Do you want to continue with these commits?"):
                 self.git_helper.reset_changes(repo=self.params_repo)
+                return False
+
+            try:
+                subprocess.run(
+                    ["git", "status"],
+                    check=True,
+                    cwd=self.params_repo,
+                )
+                subprocess.run(
+                    ["git", "diff"],
+                    check=True,
+                    cwd=self.params_repo,
+                )
+            except subprocess.CalledProcessError as e:
+                self.git_helper.error(f"Failed to run git status/diff: {e}")
                 return False
 
             # Create and merge branch
@@ -225,7 +244,7 @@ class ReleaseHelper:
             )
 
             return True
-        except Exception as e:
+        except (subprocess.SubprocessError, IOError, OSError, ValueError) as e:
             self.git_helper.error(f"Failed to update git release tag: {e}")
             return False
 

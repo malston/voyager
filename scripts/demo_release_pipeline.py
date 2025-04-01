@@ -151,7 +151,7 @@ class DemoReleasePipeline:
             raise RuntimeError(f'No release tags found in {self.repo_dir}') from err
 
     def delete_github_release(
-        self, repo: str, owner: str, tag: str, non_interactive: bool = True
+        self, repo: str, owner: str, tag: str, non_interactive: bool = False
     ) -> None:
         """Delete a GitHub release."""
         if not non_interactive:
@@ -515,6 +515,7 @@ class DemoReleasePipeline:
         version_file = os.path.join(self.repo_dir, 'version')
         if not os.path.exists(version_file):
             self.git_helper.error(f'Version file not found at {version_file}')
+            self.run_git_command(['git', 'checkout', self.branch], check=True)
             return
 
         try:
@@ -522,6 +523,7 @@ class DemoReleasePipeline:
                 current_version = f.read().strip()
         except Exception as e:
             self.git_helper.error(f'Error reading version file: {str(e)}')
+            self.run_git_command(['git', 'checkout', self.branch], check=True)
             return
 
         self.git_helper.info(f'The current version is: {current_version}')
@@ -535,13 +537,15 @@ class DemoReleasePipeline:
             else:
                 self.git_helper.info('Version reversion cancelled')
 
+        self.run_git_command(['git', 'checkout', self.branch], check=True)
+
     def run(self) -> None:
         """Run the complete demo release pipeline."""
         # Check for uncommitted changes
-        # result = subprocess.run(['git', 'status', '--porcelain'], check=True, capture_output=True, text=True)
-        # if result.stdout.strip():
-        #     self.git_helper.error("Please commit or stash your changes before running this script")
-        #     return
+        result = self.run_git_command(['git', 'status', '--porcelain'], dry_run=False, check=True, capture_output=True, text=True)
+        if result.stdout.strip():
+            self.git_helper.error("Please commit or stash your changes before running this script")
+            return
 
         # Get current branch if not specified
         if not self.branch:
@@ -564,7 +568,6 @@ class DemoReleasePipeline:
                 return False
 
         # Get latest release tag if not specified
-        git_helper = GitHelper()
         if not self.release_tag:
             self.release_tag = self.get_latest_release_tag()
 

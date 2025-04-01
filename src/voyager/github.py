@@ -23,8 +23,14 @@ class GitHubClient:
         self.verifySSL = verifySSL
 
         if not self.api_url:
-            api_url = 'https://api.github.com'
+            # Default to GitHub API URL if not provided
+            # This is the public GitHub API URL
+            # If you are using GitHub Enterprise, set GITHUB_API_URL environment variable
+            # or provide it explicitly
+            # Example: https://github.example.com/api/v3
+            self.api_url = 'https://api.github.com'
 
+        print(f'Using GitHub API URL: {self.api_url}')
         if not self.token and required:
             raise ValueError(
                 'GitHub token not found. Please set GITHUB_TOKEN environment variable or '
@@ -51,6 +57,14 @@ class GitHubClient:
         else:
             err_msg = f'Failed to get latest release: {response.status_code} - {response.text}'
             raise Exception(err_msg)
+
+    def get_releases(self, owner: str, repo: str) -> List[Dict]:
+        """Get all releases for a repository."""
+        url = f'{self.api_url}/repos/{owner}/{repo}/releases'
+        response = requests.get(url, verify=self.verifySSL, headers=self.headers)
+        if response.status_code == 200:
+            return response.json()
+        raise Exception(f'Failed to get releases: {response.status_code} - {response.text}')
 
     def delete_release(self, owner: str, repo: str, release_id: int) -> bool:
         """Delete a release by ID."""
@@ -88,11 +102,3 @@ class GitHubClient:
             return response.json()
         else:
             raise Exception(f'Failed to create release: {response.status_code} - {response.text}')
-
-    def get_releases(self, owner: str, repo: str) -> List[Dict]:
-        """Get all releases for a repository."""
-        url = f'{self.api_url}/repos/{owner}/{repo}/releases'
-        response = requests.get(url, verify=self.verifySSL, headers=self.headers)
-        if response.status_code == 200:
-            return response.json()
-        raise Exception(f'Failed to get releases: {response.status_code} - {response.text}')

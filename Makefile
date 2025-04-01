@@ -4,6 +4,7 @@
 
 PYTHON_VERSION ?= 3.13
 SRC_DIR = src/voyager
+SCRIPT_DIR = scripts
 TEST_DIR = tests
 
 # Detect Python executable (prefer python3 if available)
@@ -117,7 +118,7 @@ lint:
 format:
 	@echo "Formatting code..."
 	@if [ -d ".venv" ]; then \
-		. .venv/bin/activate && ruff format $(SRC_DIR) $(TEST_DIR); \
+		. .venv/bin/activate && ruff format $(SRC_DIR) $(TEST_DIR) $(SCRIPT_DIR); \
 	else \
 		echo "Virtual environment not found. Please run 'make venv' first."; \
 		exit 1; \

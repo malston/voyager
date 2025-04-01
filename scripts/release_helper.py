@@ -111,6 +111,7 @@ class ReleaseHelper:
     def delete_github_release(self, release_tag: str, delete_tag: bool = True) -> bool:
         """Delete a GitHub release and optionally its tag."""
         # Get the release ID from the tag name
+        release_id = None
         try:
             release = self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)
             release_id = release.get("id") if release else None

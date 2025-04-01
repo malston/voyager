@@ -76,12 +76,12 @@ class GitHubClient:
             Exception: If the API request fails
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases/latest"
-        response = requests.get(url, verify=self.verifySSL, headers=self.headers)
+        response = requests.get(url, verify=self.verifySSL, headers=self.headers, timeout=10)
 
         if response.status_code == 200:
             return response.json()
         err_msg = f"Failed to get latest release: {response.status_code} - {response.text}"
-        raise Exception(err_msg)
+        raise requests.exceptions.HTTPError(err_msg)
 
     def get_releases(self, owner: str, repo: str) -> List[Dict]:
         """Get all releases for a repository.
@@ -97,10 +97,12 @@ class GitHubClient:
             Exception: If the API request fails
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases"
-        response = requests.get(url, verify=self.verifySSL, headers=self.headers)
+        response = requests.get(url, verify=self.verifySSL, headers=self.headers, timeout=10)
         if response.status_code == 200:
             return response.json()
-        raise Exception(f"Failed to get releases: {response.status_code} - {response.text}")
+        raise requests.exceptions.HTTPError(
+            f"Failed to get releases: {response.status_code} - {response.text}"
+        )
 
     def delete_release(self, owner: str, repo: str, release_id: int) -> None:
         """Delete a release by ID.
@@ -114,9 +116,11 @@ class GitHubClient:
             Exception: If the API request fails
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases/{release_id}"
-        response = requests.delete(url, verify=self.verifySSL, headers=self.headers)
+        response = requests.delete(url, verify=self.verifySSL, headers=self.headers, timeout=10)
         if response.status_code != 204:
-            raise Exception(f"Failed to delete release: {response.status_code} - {response.text}")
+            raise requests.exceptions.HTTPError(
+                f"Failed to delete release: {response.status_code} - {response.text}"
+            )
 
     def create_release(
         self,
@@ -155,9 +159,13 @@ class GitHubClient:
             "prerelease": prerelease,
         }
 
-        response = requests.post(url, verify=self.verifySSL, headers=self.headers, json=payload)
+        response = requests.post(
+            url, verify=self.verifySSL, headers=self.headers, json=payload, timeout=10
+        )
 
         if response.status_code in (200, 201):
             return response.json()
-        else:
-            raise Exception(f"Failed to create release: {response.status_code} - {response.text}")
+
+        raise requests.exceptions.HTTPError(
+            f"Failed to create release: {response.status_code} - {response.text}"
+        )

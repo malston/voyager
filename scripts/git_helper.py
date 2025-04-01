@@ -8,9 +8,10 @@ from typing import List, Optional
 class GitHelper:
     """Helper class for git operations used in release pipeline scripts."""
 
-    def __init__(self, repo_dir: Optional[str] = None):
+    def __init__(self, repo_dir: Optional[str] = None, repo: Optional[str] = None):
         self.home = os.path.expanduser("~")
-        self.repo_dir = repo_dir if repo_dir else os.path.join(self.home, "git")
+        self.repo = repo
+        self.repo_dir = repo_dir if repo_dir else os.path.join(self.home, "git", self.repo)
 
     def info(self, message: str) -> None:
         """Print an info message."""

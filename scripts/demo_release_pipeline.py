@@ -5,15 +5,15 @@ import os
 import re
 import subprocess
 import sys
-from typing import Optional, Tuple
+from typing import Optional
 from pathlib import Path
 from voyager.github import GitHubClient
+from scripts.git_helper import GitHelper
+from scripts.release_helper import ReleaseHelper
 
 # Add the project root to the Python path
-project_root = str(Path(__file__).parent.parent)
-sys.path.insert(0, project_root)
-
-from scripts.git_helper import GitHelper
+PROJECT_ROOT = str(Path(__file__).parent.parent)
+sys.path.insert(0, PROJECT_ROOT)
 
 
 class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
@@ -59,7 +59,7 @@ class DemoReleasePipeline:
 
         self.github_token = os.getenv("GITHUB_TOKEN")
         self.git_helper = GitHelper(repo_dir=self.repo_dir)
-        self.github_client = GitHubClient(token=self.github_token)
+        self.release_helper = ReleaseHelper(repo=self.repo, owner=self.owner)
 
         if not self.github_token:
             raise ValueError("GITHUB_TOKEN env must be set before executing this script")
@@ -94,6 +94,9 @@ class DemoReleasePipeline:
             self.git_helper.info(f'[DRY RUN] Would run git command: {" ".join(command)}')
             return None
 
+        # Set check=False by default unless overridden in kwargs
+        if "check" not in kwargs:
+            kwargs["check"] = False
         return subprocess.run(command, cwd=self.repo_dir, **kwargs)
 
     def validate_git_tag(self, version: str) -> bool:
@@ -139,7 +142,7 @@ class DemoReleasePipeline:
 
             return version
 
-    def get_latest_release_tag(self, cwd: Optional[str] = None) -> str:
+    def get_latest_release_tag(self) -> str:
         """Get the latest release tag from git."""
         print(f"Getting latest release tag from {self.repo_dir}...")
         try:
@@ -164,7 +167,7 @@ class DemoReleasePipeline:
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as err:
-            self.error(f"No release tags found in {self.repo_dir}.")
+            self.git_helper.error(f"No release tags found in {self.repo_dir}.")
             raise RuntimeError(f"No release tags found in {self.repo_dir}") from err
 
     def delete_github_release(
@@ -178,7 +181,7 @@ class DemoReleasePipeline:
 
         try:
             # Get all releases to find the one with matching tag
-            releases = self.github_client.get_releases(owner, repo)
+            releases = self.release_helper.get_releases(owner, repo)
         except Exception as e:
             self.git_helper.error(f"Error fetching releases: {str(e)}")
             return
@@ -205,14 +208,14 @@ class DemoReleasePipeline:
                 return
 
             # Delete the release
-            if self.github_client.delete_release(owner, repo, release_id):
+            if self.release_helper.delete_github_release(release_id):
                 self.git_helper.info(
                     f"Successfully deleted GitHub release {tag} for {owner}/{repo}"
                 )
             else:
                 self.git_helper.error(f"Failed to delete GitHub release {tag}")
 
-        except Exception as e:
+        except (ValueError, KeyError, ConnectionError) as e:
             self.git_helper.error(f"Error deleting GitHub release: {str(e)}")
 
     def revert_version(self, previous_version: str) -> None:
@@ -400,7 +403,9 @@ class DemoReleasePipeline:
             )
             input("Press enter to continue")
 
-            if not self.git_helper.update_git_release_tag(self.owner, self.repo, self.params_repo):
+            if not self.git_helper.update_params_git_release_tag(
+                self.owner, self.repo, self.params_repo
+            ):
                 self.git_helper.error("Failed to update git release tag")
 
     def run_set_release_pipeline(self) -> None:

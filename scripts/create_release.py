@@ -117,7 +117,7 @@ def main() -> None:
         if args.dry_run:
             git_helper.info("Would update git release tag")
         else:
-            if not release_helper.update_git_release_tag():
+            if not release_helper.update_params_git_release_tag():
                 git_helper.error("Failed to update git release tag")
                 return
 

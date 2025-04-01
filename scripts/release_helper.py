@@ -1,23 +1,39 @@
 #!/usr/bin/env python3
 
+from typing import List
+from pathlib import Path
 import os
 import sys
 import subprocess
 import argparse
-from typing import Optional, List, Tuple
-from pathlib import Path
+import requests
+from git_helper import GitHelper
 from voyager.github import GitHubClient
-
-from .git_helper import GitHelper
 
 
 class ReleaseHelper:
+    """Helper class for managing releases.
+
+    This class provides functionality for managing releases, including getting release tags,
+    validating release parameters, and interacting with Git repositories.
+
+    Attributes:
+        repo (str): The name of the main repository
+        owner (str): The owner/organization of the repository (default: "Utilities-tkgieng")
+        params_repo (str): The name of the params repository (default: "params")
+        git_helper (GitHelper): Helper instance for Git operations
+        github_client (GitHubClient): Client for GitHub API interactions
+        home (str): User's home directory path
+        repo_dir (str): Full path to the main repository
+        params_dir (str): Full path to the params repository
+    """
+
     def __init__(self, repo: str, owner: str = "Utilities-tkgieng", params_repo: str = "params"):
         self.repo = repo
         self.owner = owner
         self.params_repo = params_repo
         self.git_helper = GitHelper()
-        self.github_client = GitHubClient(owner=owner)
+        self.github_client = GitHubClient()
         self.home = str(Path.home())
         self.repo_dir = os.path.join(self.home, "git", self.repo)
         self.params_dir = os.path.join(self.home, "git", self.params_repo)
@@ -42,6 +58,10 @@ class ReleaseHelper:
         """Get the latest release version without the 'release-v' prefix."""
         tag = self.get_latest_release_tag()
         return tag.replace("release-v", "")
+
+    def get_releases(self) -> List[str]:
+        """Get all releases for the repository."""
+        return self.github_client.get_releases(self.owner, self.repo)
 
     def validate_release_param(self, param: str) -> bool:
         """Validate a release parameter format."""
@@ -88,11 +108,11 @@ class ReleaseHelper:
     def delete_github_release(self, release_tag: str, delete_tag: bool = True) -> bool:
         """Delete a GitHub release and optionally its tag."""
         try:
-            self.github_client.delete_release(release_tag)
+            self.github_client.delete_release(self.owner, self.repo, release_tag)
             if delete_tag:
                 self.git_helper.delete_tag(release_tag)
             return True
-        except Exception as e:
+        except (requests.exceptions.HTTPError, ValueError, ConnectionError) as e:
             self.git_helper.error(f"Failed to delete release: {e}")
             return False
 
@@ -123,7 +143,7 @@ class ReleaseHelper:
             if tag.startswith(self.repo):
                 self.git_helper.info(f'> {tag.replace(f"{self.repo}-", "")}')
 
-    def update_git_release_tag(self) -> bool:
+    def update_params_git_release_tag(self) -> bool:
         """Update the git release tag in params repo."""
         try:
             self.git_helper.pull_all()
@@ -357,7 +377,7 @@ def main():
     # Run release pipeline
     if helper.run_release_pipeline(args.foundation, args.message):
         # Update git release tag
-        helper.update_git_release_tag()
+        helper.update_params_git_release_tag()
         # Run set pipeline
         helper.run_set_pipeline(args.foundation)
 

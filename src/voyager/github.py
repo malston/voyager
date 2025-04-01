@@ -83,21 +83,25 @@ class GitHubClient:
         err_msg = f"Failed to get latest release: {response.status_code} - {response.text}"
         raise requests.exceptions.HTTPError(err_msg)
 
-    def get_releases(self, owner: str, repo: str) -> List[Dict]:
+    def get_releases(self, owner: str, repo: str, per_page: int = 30) -> List[Dict]:
         """Get all releases for a repository.
 
         Args:
             owner: Repository owner
             repo: Repository name
+            per_page: Number of releases to return per page (default: 30)
 
         Returns:
             List of dictionaries containing release information
 
         Raises:
-            Exception: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases"
-        response = requests.get(url, verify=self.verify_ssl, headers=self.headers, timeout=10)
+        params = {"per_page": per_page}
+        response = requests.get(
+            url, verify=self.verify_ssl, headers=self.headers, params=params, timeout=10
+        )
         if response.status_code == 200:
             return response.json()
         raise requests.exceptions.HTTPError(

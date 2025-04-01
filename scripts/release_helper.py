@@ -111,17 +111,28 @@ class ReleaseHelper:
     def delete_github_release(self, release_tag: str, delete_tag: bool = True) -> bool:
         """Delete a GitHub release and optionally its tag."""
         # Get the release ID from the tag name
-        release = self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)
-        release_id = release.get("id") if release else None
+        try:
+            release = self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)
+            release_id = release.get("id") if release else None
+        except (requests.exceptions.RequestException) as e:
+            self.git_helper.warn(f"Failed to find release: {e}")
         if not release_id:
-            self.git_helper.error(f"Release for {self.owner}/{self.repo} with tag {release_tag} not found")
-            return False
+            self.git_helper.warn(
+                f"Release for {self.owner}/{self.repo} with tag {release_tag} not found"
+            )
+            try:
+                if delete_tag:
+                    self.git_helper.delete_tag(release_tag)
+                return True
+            except (requests.exceptions.RequestException) as e:
+                self.git_helper.error(f"Failed to delete tag {release_tag}: {e}")
+                return False
         try:
             self.github_client.delete_release(self.owner, self.repo, release_id)
             if delete_tag:
                 self.git_helper.delete_tag(release_tag)
             return True
-        except (requests.exceptions.HTTPError, ValueError, ConnectionError) as e:
+        except (requests.exceptions.RequestException) as e:
             self.git_helper.error(f"Failed to delete release: {e}")
             return False
 

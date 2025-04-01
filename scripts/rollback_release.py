@@ -70,6 +70,9 @@ def main() -> None:
     args = parse_args()
     repo = "ns-mgmt"
 
+    if args.owner != "Utilities-tkgieng":
+        repo = f"{repo}-{args.owner}"
+
     # Initialize helpers
     git_helper = GitHelper(repo=repo)
     git_helper.check_git()

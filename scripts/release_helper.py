@@ -114,7 +114,7 @@ class ReleaseHelper:
         release = self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)
         release_id = release.get("id") if release else None
         if not release_id:
-            self.git_helper.error(f"Release with tag {release_tag} not found")
+            self.git_helper.error(f"Release for {self.owner}/{self.repo} with tag {release_tag} not found")
             return False
         try:
             self.github_client.delete_release(self.owner, self.repo, release_id)
@@ -214,6 +214,8 @@ class ReleaseHelper:
     def run_release_pipeline(self, foundation: str, message_body: str = "") -> bool:
         """Run the release pipeline."""
         pipeline = f"tkgi-{self.repo}-release"
+        if self.owner != "Utilities-tkgieng":
+            pipeline = f"tkgi-{self.repo}-{self.owner}-release"
         self.git_helper.info(f"Running {pipeline} pipeline...")
 
         if not self.git_helper.confirm("Do you want to continue?"):
@@ -263,6 +265,8 @@ class ReleaseHelper:
     def run_set_pipeline(self, foundation: str) -> bool:
         """Run the set release pipeline."""
         pipeline = f"tkgi-{self.repo}-{foundation}-set-release-pipeline"
+        if self.owner != "Utilities-tkgieng":
+            pipeline = f"tkgi-{self.repo}-{self.owner}-{foundation}-set-release-pipeline"
         self.git_helper.info(f"Running {pipeline} pipeline...")
 
         if not self.git_helper.confirm("Do you want to continue?"):

@@ -83,6 +83,10 @@ def main() -> None:
     repo = "ns-mgmt"
     release_pipeline = f"tkgi-{repo}-release"
 
+    if args.owner != "Utilities-tkgieng":
+        repo = f"{repo}-{args.owner}"
+        release_pipeline = f"tkgi-{repo}-release"
+
     # Initialize helpers
     git_helper = GitHelper(repo=repo)
     if not git_helper.check_git():
@@ -111,7 +115,7 @@ def main() -> None:
                 git_helper.info(f"Release message: {args.message}")
         else:
             if not release_helper.run_release_pipeline(
-                args.foundation, release_pipeline, args.message
+                args.foundation, args.message
             ):
                 git_helper.error("Failed to run release pipeline")
                 return

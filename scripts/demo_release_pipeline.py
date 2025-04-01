@@ -184,7 +184,7 @@ class DemoReleasePipeline:
 
         try:
             # Get all releases to find the one with matching tag
-            releases = self.release_helper.get_releases(owner, repo)
+            releases = self.release_helper.get_releases()
         except Exception as e:
             self.git_helper.error(f"Error fetching releases: {str(e)}")
             return

@@ -7,13 +7,13 @@ import subprocess
 import sys
 from typing import Optional
 from pathlib import Path
-from voyager.github import GitHubClient
-from scripts.git_helper import GitHelper
-from scripts.release_helper import ReleaseHelper
 
 # Add the project root to the Python path
 PROJECT_ROOT = str(Path(__file__).parent.parent)
 sys.path.insert(0, PROJECT_ROOT)
+
+from scripts.git_helper import GitHelper
+from scripts.release_helper import ReleaseHelper
 
 
 class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):

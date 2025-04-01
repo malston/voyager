@@ -115,7 +115,7 @@ class ReleaseHelper:
         try:
             release = self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)
             release_id = release.get("id") if release else None
-        except (requests.exceptions.RequestException) as e:
+        except requests.exceptions.RequestException as e:
             self.git_helper.warn(f"Failed to find release: {e}")
         if not release_id:
             self.git_helper.warn(
@@ -125,7 +125,7 @@ class ReleaseHelper:
                 if delete_tag:
                     self.git_helper.delete_tag(release_tag)
                 return True
-            except (requests.exceptions.RequestException) as e:
+            except requests.exceptions.RequestException as e:
                 self.git_helper.error(f"Failed to delete tag {release_tag}: {e}")
                 return False
         try:
@@ -133,7 +133,7 @@ class ReleaseHelper:
             if delete_tag:
                 self.git_helper.delete_tag(release_tag)
             return True
-        except (requests.exceptions.RequestException) as e:
+        except requests.exceptions.RequestException as e:
             self.git_helper.error(f"Failed to delete release: {e}")
             return False
 

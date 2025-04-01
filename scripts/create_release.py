@@ -114,9 +114,7 @@ def main() -> None:
             if args.message:
                 git_helper.info(f"Release message: {args.message}")
         else:
-            if not release_helper.run_release_pipeline(
-                args.foundation, args.message
-            ):
+            if not release_helper.run_release_pipeline(args.foundation, args.message):
                 git_helper.error("Failed to run release pipeline")
                 return
 

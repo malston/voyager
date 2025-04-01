@@ -108,6 +108,22 @@ class GitHubClient:
             f"Failed to get releases: {response.status_code} - {response.text}"
         )
 
+    def find_release_by_tag(self, owner: str, repo: str, tag_name: str) -> Optional[Dict]:
+        """Find a release by tag name.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            tag_name: Tag name of the release
+        Returns:
+            Dict containing release information if found, None otherwise
+        """
+        releases = self.get_releases(owner, repo)
+        for release in releases:
+            if release.get("tag_name") == tag_name:
+                return release
+        return None
+
     def delete_release(self, owner: str, repo: str, release_id: int) -> None:
         """Delete a release by ID.
 

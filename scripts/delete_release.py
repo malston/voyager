@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 
+# Delete a GitHub release.
+# This script deletes a GitHub release and optionally the associated git tag.
+# Usage:
+#     delete_release.py -r release_tag [-o owner] [-x] [-n] [-h]
+# Options:
+#     -r release_tag   the release tag
+#     -o owner         the github owner (default: Utilities-tkgieng)
+#     -x               do not delete the git tag
+#     -n               non-interactive
+#     -h               display usage
+
 import argparse
-import os
 import sys
 from pathlib import Path
-
-# Add the project root to the Python path
-project_root = str(Path(__file__).parent.parent)
-sys.path.insert(0, project_root)
-
 from scripts.release_helper import ReleaseHelper
 from scripts.git_helper import GitHelper
 
+# Add the project root to the Python path
+PROJECT_ROOT = str(Path(__file__).parent.parent)
+sys.path.insert(0, PROJECT_ROOT)
+
 
 class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Custom help formatter to modify the help output."""
+
     def format_help(self):
         help_text = super().format_help()
         # Remove the default options section
@@ -24,6 +35,7 @@ class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         prog="delete_release.py",
         description="Delete a GitHub release",
@@ -92,7 +104,7 @@ def main() -> None:
             git_helper.error("Failed to delete GitHub release")
             return
 
-    except Exception as e:
+    except (ConnectionError, ValueError, ImportError, FileNotFoundError, PermissionError) as e:
         git_helper.error(f"Unexpected error: {e}")
         return
 

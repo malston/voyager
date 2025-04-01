@@ -21,7 +21,7 @@ class GitHubClient:
         api_url: Optional[str] = None,
         token: Optional[str] = None,
         required: bool = True,
-        verifySSL: bool = False,
+        verify_ssl: bool = False,
     ) -> None:
         """Initialize the GitHub client.
 
@@ -30,12 +30,12 @@ class GitHubClient:
                     or defaults to https://api.github.com
             token: Optional GitHub API token. If not provided, uses GITHUB_TOKEN env var
             required: Whether token is required (defaults to True)
-            verifySSL: Whether to verify SSL certificates (defaults to False)
+            verify_ssl: Whether to verify SSL certificates (defaults to False)
         """
         self.api_url = api_url or os.environ.get("GITHUB_API_URL")
         self.token = token or os.environ.get("GITHUB_TOKEN")
         self.is_authenticated = bool(self.token)
-        self.verifySSL = verifySSL
+        self.verify_ssl = verify_ssl
 
         if not self.api_url:
             # Default to GitHub API URL if not provided
@@ -59,7 +59,7 @@ class GitHubClient:
         if self.token:
             self.headers["Authorization"] = f"token {self.token}"
 
-        if not self.verifySSL:
+        if not self.verify_ssl:
             urllib3.disable_warnings()
 
     def get_latest_release(self, owner: str, repo: str) -> Dict:
@@ -76,7 +76,7 @@ class GitHubClient:
             Exception: If the API request fails
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases/latest"
-        response = requests.get(url, verify=self.verifySSL, headers=self.headers, timeout=10)
+        response = requests.get(url, verify=self.verify_ssl, headers=self.headers, timeout=10)
 
         if response.status_code == 200:
             return response.json()
@@ -97,7 +97,7 @@ class GitHubClient:
             Exception: If the API request fails
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases"
-        response = requests.get(url, verify=self.verifySSL, headers=self.headers, timeout=10)
+        response = requests.get(url, verify=self.verify_ssl, headers=self.headers, timeout=10)
         if response.status_code == 200:
             return response.json()
         raise requests.exceptions.HTTPError(
@@ -116,7 +116,7 @@ class GitHubClient:
             Exception: If the API request fails
         """
         url = f"{self.api_url}/repos/{owner}/{repo}/releases/{release_id}"
-        response = requests.delete(url, verify=self.verifySSL, headers=self.headers, timeout=10)
+        response = requests.delete(url, verify=self.verify_ssl, headers=self.headers, timeout=10)
         if response.status_code != 204:
             raise requests.exceptions.HTTPError(
                 f"Failed to delete release: {response.status_code} - {response.text}"
@@ -160,7 +160,7 @@ class GitHubClient:
         }
 
         response = requests.post(
-            url, verify=self.verifySSL, headers=self.headers, json=payload, timeout=10
+            url, verify=self.verify_ssl, headers=self.headers, json=payload, timeout=10
         )
 
         if response.status_code in (200, 201):

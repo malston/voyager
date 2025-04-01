@@ -72,8 +72,7 @@ class GitHubClient:
         response = requests.delete(url, verify=self.verifySSL, headers=self.headers)
         if response.status_code == 204:
             return True
-        self.error(f"Failed to delete release: {response.status_code} - {response.text}")
-        return False
+        raise Exception(f"Failed to delete release: {response.status_code} - {response.text}")
 
     def create_release(
         self,

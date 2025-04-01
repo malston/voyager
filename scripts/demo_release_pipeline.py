@@ -49,12 +49,6 @@ class DemoReleasePipeline:
         self.owner = owner
         self.repo = repo
         self.params_repo = params_repo
-        self.github_token = os.getenv('GITHUB_TOKEN')
-        self.git_helper = GitHelper()
-        self.github_client = GitHubClient(token=self.github_token)
-
-        if not self.github_token:
-            raise ValueError('GITHUB_TOKEN env must be set before executing this script')
 
         # Store the repo directory path
         if git_dir is None:
@@ -62,6 +56,13 @@ class DemoReleasePipeline:
         self.repo_dir = os.path.join(git_dir, self.repo)
         if not os.path.isdir(self.repo_dir):
             raise ValueError(f'Could not find repo directory: {self.repo_dir}')
+
+        self.github_token = os.getenv('GITHUB_TOKEN')
+        self.git_helper = GitHelper(repo_dir=self.repo_dir)
+        self.github_client = GitHubClient(token=self.github_token)
+
+        if not self.github_token:
+            raise ValueError('GITHUB_TOKEN env must be set before executing this script')
 
     def is_semantic_version(self, version: str) -> bool:
         """Check if a string is a valid semantic version number.

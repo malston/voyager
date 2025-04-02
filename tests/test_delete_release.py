@@ -154,7 +154,7 @@ def test_no_releases_found():
                     main()
 
                     # Check that error was called with "No releases found"
-                    mock_git_helper.return_value.error.assert_any_call("No releases found")
+                    mock_git_helper.return_value.info.assert_any_call("No releases found")
                     mock_release_helper.return_value.delete_release_tag.assert_called_once_with(
                         "v1.0.0"
                     )

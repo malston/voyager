@@ -135,7 +135,7 @@ def main() -> None:
         git_helper.error(f"Release {args.release_tag} not found")
         releases = release_helper.get_releases()
         if not releases:
-            git_helper.error("No releases found")
+            git_helper.info("No releases found")
             if not args.no_tag_deletion:
                 delete_git_tag(git_helper, release_helper, args.release_tag, args)
             return

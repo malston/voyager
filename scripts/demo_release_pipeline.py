@@ -218,7 +218,7 @@ class DemoReleasePipeline:
             return
 
         if not releases:
-            self.git_helper.error("No releases found")
+            self.git_helper.info("No releases found")
             return
 
         try:

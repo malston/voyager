@@ -104,8 +104,10 @@ def main() -> None:
     if not release:
         git_helper.error(f"Release {args.release_tag} not found")
         releases = release_helper.get_releases()
+        if not releases:
+            git_helper.error("No releases found")
+            return
         print(tabulate(releases, headers="keys", tablefmt="grid"))
-        print(f"Available releases:")
         for release in releases:
             print(f"{release['tag_name']} - {release['name']}")
         return

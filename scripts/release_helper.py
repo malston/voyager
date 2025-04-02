@@ -73,9 +73,13 @@ class ReleaseHelper:
         tag = self.get_latest_release_tag()
         return tag.replace("release-v", "")
 
-    def get_releases(self) -> List[str]:
+    def get_releases(self) -> Optional[List[str]]:
         """Get all releases for the repository."""
-        return self.github_client.get_releases(self.owner, self.repo)
+        try:
+            return self.github_client.get_releases(self.owner, self.repo)
+        except requests.exceptions.RequestException as e:
+            self.git_helper.error(f"Error fetching releases: {str(e)}")
+            return None
 
     def validate_release_param(self, param: str) -> bool:
         """Validate a release parameter format."""

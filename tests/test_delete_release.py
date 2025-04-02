@@ -44,7 +44,10 @@ def test_print_available_releases(capsys):
     ]
     print_available_releases(releases)
     captured = capsys.readouterr()
-    assert captured.out == "Available Github Releases:\nv1.0.0 - Release 1.0.0\nv2.0.0 - Release 2.0.0\n"
+    assert (
+        captured.out
+        == "Available Github Releases:\nv1.0.0 - Release 1.0.0\nv2.0.0 - Release 2.0.0\n"
+    )
 
 
 def test_delete_git_tag():
@@ -107,7 +110,9 @@ def test_repo_name_construction(input_args, expected_repo):
                     args = parse_args()
                     main()
 
-                    mock_git_helper.assert_called_once_with(repo="ns-mgmt", repo_dir=f"/Users/malston/git/{expected_repo}")
+                    mock_git_helper.assert_called_once_with(
+                        repo="ns-mgmt", repo_dir=f"/Users/malston/git/{expected_repo}"
+                    )
 
 
 def test_release_not_found():
@@ -150,7 +155,9 @@ def test_no_releases_found():
 
                     # Check that error was called with "No releases found"
                     mock_git_helper.return_value.error.assert_any_call("No releases found")
-                    mock_release_helper.return_value.delete_release_tag.assert_called_once_with("v1.0.0")
+                    mock_release_helper.return_value.delete_release_tag.assert_called_once_with(
+                        "v1.0.0"
+                    )
 
 
 def test_successful_deletion():
@@ -173,7 +180,9 @@ def test_successful_deletion():
                     mock_release_helper.return_value.delete_github_release.assert_called_once_with(
                         "v1.0.0", True
                     )
-                    mock_release_helper.return_value.delete_release_tag.assert_called_once_with("v1.0.0")
+                    mock_release_helper.return_value.delete_release_tag.assert_called_once_with(
+                        "v1.0.0"
+                    )
 
 
 def test_deletion_cancelled():

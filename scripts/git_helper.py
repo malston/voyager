@@ -208,3 +208,16 @@ class GitHelper:
         """Ask for user confirmation."""
         response = input(f"{message} (y/N): ")
         return response.lower().startswith("y")
+
+    def tag_exists(self, tag: str, repo: Optional[str] = None) -> bool:
+        """Check if a git tag exists."""
+        repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
+        try:
+            result = subprocess.run(
+                ["git", "show-ref", "--verify", "--quiet", f"refs/tags/{tag}"],
+                cwd=repo_dir,
+                check=True,
+            )
+            return result.returncode == 0
+        except subprocess.CalledProcessError:
+            return False

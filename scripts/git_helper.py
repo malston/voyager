@@ -3,7 +3,7 @@
 import os
 import subprocess
 import re
-from typing import List, Optional
+from typing import List, Dict, Union, Optional
 from typing import Tuple
 
 import git
@@ -91,22 +91,13 @@ class GitHelper:
             self.error(f"Failed to get current branch: {e}")
             return ""
 
-    def get_tags(self, repo: Optional[str] = None) -> List[str]:
+    def get_tags(self, repo: Optional[str] = None) -> Union[List[git.Tag], Dict[str, git.Tag]]:
         """Get all git tags."""
         repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
         try:
-            # Use shell=True to allow pipe operator
-            result = subprocess.run(
-                "git tag -l | sort -V",
-                shell=True,
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=repo_dir,
-            )
-            return result.stdout.strip().split("\n")
-        except subprocess.CalledProcessError as e:
-            self.error(f"Failed to get tags: {e}")
+            repo = git.Repo(repo_dir)
+            return repo.tags
+        except (git.InvalidGitRepositoryError, git.NoSuchPathError):
             return []
 
     def delete_tag(self, tag: str, repo: Optional[str] = None) -> bool:

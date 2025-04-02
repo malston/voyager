@@ -2,6 +2,7 @@
 
 from typing import List, Union, Optional
 from pathlib import Path
+from packaging import version
 import os
 import sys
 import subprocess
@@ -200,15 +201,21 @@ class ReleaseHelper:
         try:
             self.git_helper.pull_all()
             tags = self.git_helper.get_tags()
-            release_tags = [t for t in tags if t.startswith("release-v")]
+            release_tags = [t for t in tags if t.name.startswith("release-v")]
             if not release_tags:
                 self.git_helper.error("No release tags found")
                 return False
 
-            last_release = sorted(release_tags)[-2] if len(release_tags) > 1 else release_tags[0]
-            current_release = sorted(release_tags)[-1]
-            last_version = last_release.replace("release-v", "")
-            current_version = current_release.replace("release-v", "")
+            last_release = (
+                sorted(release_tags, key=lambda t: version.parse(t.name.lstrip("release-v")))[-2]
+                if len(release_tags) > 1
+                else release_tags[0]
+            )
+            current_release = sorted(
+                release_tags, key=lambda t: version.parse(t.name.lstrip("release-v"))
+            )[-1]
+            last_version = last_release.name.replace("release-v", "")
+            current_version = current_release.name.replace("release-v", "")
 
             self.git_helper.info(
                 f"Updating the params for the tkgi-{self.repo} pipeline from {last_version} to {current_version}"

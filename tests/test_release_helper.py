@@ -31,7 +31,14 @@ class TestReleaseHelper(unittest.TestCase):
         """Test successful update of params git release tag."""
         # Setup mock GitHelper instance
         self.mock_git.pull_all.return_value = None
-        self.mock_git.get_tags.return_value = ["release-v1.0.0", "release-v1.1.0"]
+
+        # Create mock git tag objects
+        mock_tag1 = MagicMock()
+        mock_tag1.name = "release-v1.0.0"
+        mock_tag2 = MagicMock()
+        mock_tag2.name = "release-v1.1.0"
+        self.mock_git.get_tags.return_value = [mock_tag1, mock_tag2]
+
         self.mock_git.confirm.side_effect = [True, True]  # Confirm both prompts
         self.mock_git.has_uncommitted_changes.return_value = False
         self.mock_git.update_release_tag_in_params.return_value = None
@@ -91,7 +98,14 @@ class TestReleaseHelper(unittest.TestCase):
         """Test failure when there are uncommitted changes in params repo."""
         # Setup mock GitHelper instance
         self.mock_git.pull_all.return_value = None
-        self.mock_git.get_tags.return_value = ["release-v1.0.0", "release-v1.1.0"]
+
+        # Create mock git tag objects
+        mock_tag1 = MagicMock()
+        mock_tag1.name = "release-v1.0.0"
+        mock_tag2 = MagicMock()
+        mock_tag2.name = "release-v1.1.0"
+        self.mock_git.get_tags.return_value = [mock_tag1, mock_tag2]
+
         self.mock_git.confirm.return_value = True
         self.mock_git.has_uncommitted_changes.return_value = True
         self.mock_git.error.return_value = None
@@ -107,7 +121,14 @@ class TestReleaseHelper(unittest.TestCase):
         """Test when user cancels the operation."""
         # Setup mock GitHelper instance
         self.mock_git.pull_all.return_value = None
-        self.mock_git.get_tags.return_value = ["release-v1.0.0", "release-v1.1.0"]
+
+        # Create mock git tag objects
+        mock_tag1 = MagicMock()
+        mock_tag1.name = "release-v1.0.0"
+        mock_tag2 = MagicMock()
+        mock_tag2.name = "release-v1.1.0"
+        self.mock_git.get_tags.return_value = [mock_tag1, mock_tag2]
+
         self.mock_git.confirm.return_value = False
         self.mock_git.info.return_value = None
 
@@ -121,7 +142,14 @@ class TestReleaseHelper(unittest.TestCase):
         """Test handling of git command errors."""
         # Setup mock GitHelper instance
         self.mock_git.pull_all.return_value = None
-        self.mock_git.get_tags.return_value = ["release-v1.0.0", "release-v1.1.0"]
+
+        # Create mock git tag objects
+        mock_tag1 = MagicMock()
+        mock_tag1.name = "release-v1.0.0"
+        mock_tag2 = MagicMock()
+        mock_tag2.name = "release-v1.1.0"
+        self.mock_git.get_tags.return_value = [mock_tag1, mock_tag2]
+
         self.mock_git.confirm.return_value = True
         self.mock_git.has_uncommitted_changes.return_value = False
         self.mock_git.update_release_tag_in_params.side_effect = subprocess.SubprocessError(

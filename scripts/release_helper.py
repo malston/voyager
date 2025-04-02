@@ -40,9 +40,8 @@ class ReleaseHelper:
         self.repo = repo
         self.owner = owner
         self.params_repo = params_repo
-        self.git_helper = GitHelper(repo=repo)
-        self.github_token = token = os.getenv("GITHUB_TOKEN")
-        self.github_client = GitHubClient()
+        self.git_helper = GitHelper(repo=repo, repo_dir=repo_dir)
+        self.github_client = GitHubClient(token=token)
         self.home = str(Path.home())
         self.repo_dir = repo_dir if repo_dir else os.path.join(self.home, "git", self.repo)
         self.params_dir = (

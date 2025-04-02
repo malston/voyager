@@ -12,6 +12,7 @@
 #     -h               display usage
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from tabulate import tabulate
@@ -46,11 +47,11 @@ def parse_args() -> argparse.Namespace:
         usage="%(prog)s -r release_tag [-o owner] [-x] [-n] [-h]",
         epilog="""
 Options:
-   -r release_tag   the release tag
-   -o owner         the github owner (default: Utilities-tkgieng)
-   -x               do not delete the git tag
-   -n               non-interactive
-   -h               display usage
+  -r release_tag   the release tag
+  -o owner         the github owner (default: Utilities-tkgieng)
+  -x               do not delete the git tag
+  -n               non-interactive
+  -h               display usage
 """,
     )
     parser.add_argument(
@@ -90,15 +91,21 @@ def main() -> None:
     args = parse_args()
     repo = "ns-mgmt"
 
+    git_dir = os.path.expanduser("~/git")
+    repo_dir = os.path.join(git_dir, repo)
+
+    # Check if repo ends with the owner
     if args.owner != "Utilities-tkgieng":
-        repo = f"{repo}-{args.owner}"
+        repo_dir = os.path.join(git_dir, f"{repo}-{args.owner}")
+    if not os.path.isdir(repo_dir):
+        raise ValueError(f"Could not find repo directory: {repo_dir}")
 
     # Initialize helpers
-    git_helper = GitHelper(repo=repo)
+    release_helper = ReleaseHelper(repo=repo, repo_dir=repo_dir, owner=args.owner)
+    git_helper = GitHelper(repo=repo, repo_dir=repo_dir)
     if not git_helper.check_git_repo():
         git_helper.error(f"{repo} is not a git repository")
         return
-    release_helper = ReleaseHelper(repo=repo, owner=args.owner)
 
     release = release_helper.get_github_release_by_tag(args.release_tag)
     if not release:
@@ -107,7 +114,8 @@ def main() -> None:
         if not releases:
             git_helper.error("No releases found")
             return
-        print(tabulate(releases, headers="keys", tablefmt="grid"))
+        # print(tabulate(releases, headers="keys", tablefmt="grid"))
+        print(f"Available Github Releases:")
         for release in releases:
             print(f"{release['tag_name']} - {release['name']}")
         return

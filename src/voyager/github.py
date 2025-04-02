@@ -128,7 +128,6 @@ class GitHubClient:
         try:
             releases = self.get_releases(owner, repo)
             for release in releases:
-                print(f"Release: {release}")
                 if release.get("tag_name") == tag_name:
                     return release
             return None

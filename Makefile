@@ -30,7 +30,7 @@ help:
 	@echo "  make activate  - Show instructions to activate virtual environment"
 	@echo "  make test      - Run tests"
 	@echo "  make lint      - Run linting checks (ruff)"
-	@echo "  make format    - Format code (ruff format)"
+	@echo "  make format    - Format code (black)"
 	@echo "  make clean     - Remove build artifacts and cache directories"
 	@echo "  make build     - Build package distribution files"
 	@echo "  make publish   - Publish package to PyPI (requires credentials)"
@@ -108,7 +108,7 @@ activate:
 lint:
 	@echo "Running linting checks..."
 	@if [ -d ".venv" ]; then \
-		. .venv/bin/activate && ruff check $(SRC_DIR) $(TEST_DIR); \
+		. .venv/bin/activate && ruff check $(SRC_DIR) $(TEST_DIR) --fix; \
 	else \
 		echo "Virtual environment not found. Please run 'make venv' first."; \
 		exit 1; \
@@ -118,7 +118,7 @@ lint:
 format:
 	@echo "Formatting code..."
 	@if [ -d ".venv" ]; then \
-		. .venv/bin/activate && ruff format $(SRC_DIR) $(TEST_DIR) $(SCRIPT_DIR); \
+		. .venv/bin/activate && black $(SRC_DIR) $(TEST_DIR) $(SCRIPT_DIR); \
 	else \
 		echo "Virtual environment not found. Please run 'make venv' first."; \
 		exit 1; \
@@ -137,7 +137,7 @@ test:
 # Clean build artifacts and cache directories
 clean:
 	@echo "Cleaning build artifacts and cache directories..."
-	@rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .coverage .ruff_cache/
+	@rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .coverage .ruff_cache/ .black_cache/
 	@find . -type d -name "__pycache__" -exec rm -rf {} +
 	@find . -type f -name "*.pyc" -delete
 	@echo "Cleaned"

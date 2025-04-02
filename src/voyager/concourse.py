@@ -19,26 +19,26 @@ def get_flyrc_data(target: str = None) -> Optional[Dict]:
     Returns:
         Dict containing the flyrc data, or None if file doesn't exist or can't be parsed
     """
-    flyrc_path = Path.home() / '.flyrc'
+    flyrc_path = Path.home() / ".flyrc"
     if not flyrc_path.exists():
         return None
 
     try:
-        with open(flyrc_path, 'r') as f:
+        with open(flyrc_path, "r") as f:
             flyrc_data = yaml.safe_load(f)
 
-        if not flyrc_data or 'targets' not in flyrc_data:
+        if not flyrc_data or "targets" not in flyrc_data:
             return None
 
         if target:
             # Get the specified target data if it exists
-            if target in flyrc_data.get('targets', {}):
-                return {'targets': {target: flyrc_data['targets'][target]}}
+            if target in flyrc_data.get("targets", {}):
+                return {"targets": {target: flyrc_data["targets"][target]}}
             return None
 
         return flyrc_data
     except (yaml.YAMLError, IOError) as e:
-        click.echo(f'Error reading flyrc file: {e}', err=True)
+        click.echo(f"Error reading flyrc file: {e}", err=True)
         return None
 
 
@@ -53,20 +53,20 @@ def get_concourse_data_from_flyrc(target: str) -> Optional[Dict]:
         Dict containing team, api_url, and token if found, None otherwise
     """
     flyrc_data = get_flyrc_data(target)
-    if not flyrc_data or 'targets' not in flyrc_data or target not in flyrc_data['targets']:
+    if not flyrc_data or "targets" not in flyrc_data or target not in flyrc_data["targets"]:
         return None
 
-    target_data = flyrc_data['targets'][target]
+    target_data = flyrc_data["targets"][target]
 
     # Extract relevant information
     result = {
-        'team': target_data.get('team'),
-        'api_url': target_data.get('api'),
-        'token': target_data.get('token', {}).get('value'),
+        "team": target_data.get("team"),
+        "api_url": target_data.get("api"),
+        "token": target_data.get("token", {}).get("value"),
     }
 
     # Ensure we have the minimum required information
-    if not result['team'] or not result['api_url']:
+    if not result["team"] or not result["api_url"]:
         return None
 
     return result
@@ -86,7 +86,7 @@ def get_token_from_flyrc(target: str) -> Optional[str]:
     if not concourse_data:
         return None
 
-    return concourse_data.get('token')
+    return concourse_data.get("token")
 
 
 def get_api_url_from_flyrc(target: str) -> Optional[str]:
@@ -103,7 +103,7 @@ def get_api_url_from_flyrc(target: str) -> Optional[str]:
     if not concourse_data:
         return None
 
-    return concourse_data.get('api_url')
+    return concourse_data.get("api_url")
 
 
 def get_team_from_flyrc(target: str) -> Optional[str]:
@@ -120,7 +120,7 @@ def get_team_from_flyrc(target: str) -> Optional[str]:
     if not concourse_data:
         return None
 
-    return concourse_data.get('team')
+    return concourse_data.get("team")
 
 
 class ConcourseClient:
@@ -158,48 +158,48 @@ class ConcourseClient:
                 token = target_token
 
         # Validate API URL
-        self.api_url = api_url.rstrip('/') if api_url else None
+        self.api_url = api_url.rstrip("/") if api_url else None
         if not self.api_url:
             raise ValueError(
-                'Concourse API URL not found. Please provide it explicitly via --concourse-url'
-                ' or ensure your ~/.flyrc file contains a valid target with --concourse-target.'
+                "Concourse API URL not found. Please provide it explicitly via --concourse-url"
+                " or ensure your ~/.flyrc file contains a valid target with --concourse-target."
             )
 
         # Validate team
         self.team = team
         if not self.team:
             raise ValueError(
-                'Concourse team not found. Please provide it explicitly via --concourse-team'
-                ' or ensure your ~/.flyrc file contains a valid target with --concourse-target.'
+                "Concourse team not found. Please provide it explicitly via --concourse-team"
+                " or ensure your ~/.flyrc file contains a valid target with --concourse-target."
             )
 
         # Try to get token in priority order:
         # 1. Explicitly provided token
         # 2. CONCOURSE_TOKEN environment variable
         # 3. Token from ~/.flyrc file for the specified target
-        self.token = token or os.environ.get('CONCOURSE_TOKEN')
+        self.token = token or os.environ.get("CONCOURSE_TOKEN")
 
         if not self.token:
             raise ValueError(
-                'Concourse token not found. Please set CONCOURSE_TOKEN environment variable, '
-                'provide it explicitly, or ensure your ~/.flyrc file contains credentials '
-                'for the target specified with --concourse-target.'
+                "Concourse token not found. Please set CONCOURSE_TOKEN environment variable, "
+                "provide it explicitly, or ensure your ~/.flyrc file contains credentials "
+                "for the target specified with --concourse-target."
             )
 
-        self.headers = {'Authorization': f'Bearer {self.token}', 'Content-Type': 'application/json'}
+        self.headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
 
     def trigger_pipeline(
         self, pipeline_name: str, job_name: str, variables: Dict[str, str] = None
     ) -> bool:
         """Trigger a job in a Concourse pipeline with optional variables."""
         url = (
-            f'{self.api_url}/api/v1/teams/{self.team}/pipelines/{pipeline_name}/'
-            f'jobs/{job_name}/builds'
+            f"{self.api_url}/api/v1/teams/{self.team}/pipelines/{pipeline_name}/"
+            f"jobs/{job_name}/builds"
         )
 
         payload = {}
         if variables:
-            payload = {'vars': variables}
+            payload = {"vars": variables}
 
         response = requests.post(url, headers=self.headers, json=payload)
 
@@ -207,20 +207,20 @@ class ConcourseClient:
             build_data = response.json()
             click.echo(f'Pipeline triggered: Build #{build_data.get("id", "Unknown")}')
             click.echo(
-                f'URL: {self.api_url}/teams/{self.team}/pipelines/{pipeline_name}/jobs/{job_name}/'
+                f"URL: {self.api_url}/teams/{self.team}/pipelines/{pipeline_name}/jobs/{job_name}/"
                 f'builds/{build_data.get("name", "latest")}'
             )
             return True
         else:
             click.echo(
-                f'Failed to trigger pipeline: {response.status_code} - {response.text}', err=True
+                f"Failed to trigger pipeline: {response.status_code} - {response.text}", err=True
             )
             return False
 
     def get_pipeline_builds(self, pipeline_name: str, limit: int = 5) -> List[Dict]:
         """Get recent builds for a pipeline."""
-        url = f'{self.api_url}/api/v1/teams/{self.team}/pipelines/{pipeline_name}/builds'
-        params = {'limit': limit}
+        url = f"{self.api_url}/api/v1/teams/{self.team}/pipelines/{pipeline_name}/builds"
+        params = {"limit": limit}
 
         response = requests.get(url, headers=self.headers, params=params)
 
@@ -228,6 +228,6 @@ class ConcourseClient:
             return response.json()
         else:
             click.echo(
-                f'Failed to get pipeline builds: {response.status_code} - {response.text}', err=True
+                f"Failed to get pipeline builds: {response.status_code} - {response.text}", err=True
             )
             return []

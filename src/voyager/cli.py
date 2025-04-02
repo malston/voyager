@@ -14,15 +14,15 @@ from .commands.rollback import rollback
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.version_option(version=__version__)
-@click.option('--quiet', '-q', is_flag=True, help='Suppress informational output')
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose output')
+@click.option("--quiet", "-q", is_flag=True, help="Suppress informational output")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.pass_context
 def cli(ctx, quiet, verbose):
     """Voyager - A tool for managing GitHub releases with Concourse CI pipelines."""
     # Store global options in context for subcommands to access
     ctx.ensure_object(dict)
-    ctx.obj['quiet'] = quiet
-    ctx.obj['verbose'] = verbose
+    ctx.obj["quiet"] = quiet
+    ctx.obj["verbose"] = verbose
     pass
 
 
@@ -34,5 +34,5 @@ cli.add_command(init_repo)
 cli.add_command(list_group)
 cli.add_command(pipeline_group)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

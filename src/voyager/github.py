@@ -1,26 +1,41 @@
 #!/usr/bin/env python3
 
+"""GitHub API client module for interacting with GitHub's API endpoints."""
+
 import os
-import urllib3
 from typing import Dict, List, Optional
 
 import requests
+import urllib3
 
 
 class GitHubClient:
-    """Client for interacting with GitHub API."""
+    """Client for interacting with GitHub API.
+
+    This client provides methods to interact with GitHub's API endpoints,
+    including managing releases, authentication, and API configuration.
+    """
 
     def __init__(
         self,
         api_url: Optional[str] = None,
         token: Optional[str] = None,
         required: bool = True,
-        verifySSL=False,
-    ):
-        self.api_url = api_url or os.environ.get('GITHUB_API_URL')
-        self.token = token or os.environ.get('GITHUB_TOKEN')
+        verify_ssl: bool = False,
+    ) -> None:
+        """Initialize the GitHub client.
+
+        Args:
+            api_url: Optional GitHub API URL. If not provided, uses GITHUB_API_URL env var
+                    or defaults to https://api.github.com
+            token: Optional GitHub API token. If not provided, uses GITHUB_TOKEN env var
+            required: Whether token is required (defaults to True)
+            verify_ssl: Whether to verify SSL certificates (defaults to False)
+        """
+        self.api_url = api_url or os.environ.get("GITHUB_API_URL")
+        self.token = token or os.environ.get("GITHUB_TOKEN")
         self.is_authenticated = bool(self.token)
-        self.verifySSL = verifySSL
+        self.verify_ssl = verify_ssl
 
         if not self.api_url:
             # Default to GitHub API URL if not provided
@@ -28,52 +43,114 @@ class GitHubClient:
             # If you are using GitHub Enterprise, set GITHUB_API_URL environment variable
             # or provide it explicitly
             # Example: https://github.example.com/api/v3
-            self.api_url = 'https://api.github.com'
+            self.api_url = "https://api.github.com"
 
-        print(f'Using GitHub API URL: {self.api_url}')
         if not self.token and required:
             raise ValueError(
-                'GitHub token not found. Please set GITHUB_TOKEN environment variable or '
-                'provide it explicitly.'
+                "GitHub token not found. Please set GITHUB_TOKEN environment variable or "
+                "provide it explicitly."
             )
 
         self.headers = {
-            'Accept': 'application/vnd.github.v3+json',
+            "Accept": "application/vnd.github.v3+json",
         }
 
         if self.token:
-            self.headers['Authorization'] = f'token {self.token}'
+            self.headers["Authorization"] = f"token {self.token}"
 
-        if not self.verifySSL:
+        if not self.verify_ssl:
             urllib3.disable_warnings()
 
     def get_latest_release(self, owner: str, repo: str) -> Dict:
-        """Get the latest release from GitHub API."""
-        url = f'{self.api_url}/repos/{owner}/{repo}/releases/latest'
-        response = requests.get(url, verify=self.verifySSL, headers=self.headers)
+        """Get the latest release from GitHub API.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+
+        Returns:
+            Dict containing release information
+
+        Raises:
+            Exception: If the API request fails
+        """
+        url = f"{self.api_url}/repos/{owner}/{repo}/releases/latest"
+        response = requests.get(url, verify=self.verify_ssl, headers=self.headers, timeout=10)
 
         if response.status_code == 200:
             return response.json()
-        else:
-            err_msg = f'Failed to get latest release: {response.status_code} - {response.text}'
-            raise Exception(err_msg)
+        err_msg = f"Failed to get latest release: {response.status_code} - {response.text}"
+        raise requests.exceptions.HTTPError(err_msg)
 
-    def get_releases(self, owner: str, repo: str) -> List[Dict]:
-        """Get all releases for a repository."""
-        url = f'{self.api_url}/repos/{owner}/{repo}/releases'
-        response = requests.get(url, verify=self.verifySSL, headers=self.headers)
+    def get_releases(self, owner: str, repo: str, per_page: int = 30) -> List[Dict]:
+        """Get all releases for a repository.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            per_page: Number of releases to return per page (default: 30)
+
+        Returns:
+            List of dictionaries containing release information
+
+        Raises:
+            requests.exceptions.HTTPError: If the API request fails
+            requests.exceptions.Timeout: If the request times out
+            requests.exceptions.ConnectionError: If there's a connection error
+        """
+        url = f"{self.api_url}/repos/{owner}/{repo}/releases"
+        params = {"per_page": per_page}
+        response = requests.get(
+            url, verify=self.verify_ssl, headers=self.headers, params=params, timeout=10
+        )
         if response.status_code == 200:
             return response.json()
-        raise Exception(f'Failed to get releases: {response.status_code} - {response.text}')
+        raise requests.exceptions.HTTPError(
+            f"Failed to get releases: {response.status_code} - {response.text}"
+        )
 
-    def delete_release(self, owner: str, repo: str, release_id: int) -> bool:
-        """Delete a release by ID."""
-        url = f'{self.api_url}/repos/{owner}/{repo}/releases/{release_id}'
-        response = requests.delete(url, verify=self.verifySSL, headers=self.headers)
-        if response.status_code == 204:
-            return True
-        self.error(f'Failed to delete release: {response.status_code} - {response.text}')
-        return False
+    def find_release_by_tag(self, owner: str, repo: str, tag_name: str) -> Optional[Dict]:
+        """Find a release by tag name.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            tag_name: Tag name of the release
+
+        Returns:
+            Dict containing release information if found, None otherwise
+
+        Raises:
+            requests.exceptions.HTTPError: If the API request fails
+            requests.exceptions.Timeout: If the request times out
+            requests.exceptions.ConnectionError: If there's a connection error
+        """
+        try:
+            releases = self.get_releases(owner, repo)
+            for release in releases:
+                if release.get("tag_name") == tag_name:
+                    return release
+            return None
+        except requests.exceptions.RequestException as e:
+            raise requests.exceptions.RequestException(f"Failed to find release by tag: {str(e)}")
+
+    def delete_release(self, owner: str, repo: str, release_id: int) -> None:
+        """Delete a release by ID.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            release_id: ID of the release to delete
+
+        Raises:
+            Exception: If the API request fails
+        """
+        url = f"{self.api_url}/repos/{owner}/{repo}/releases/{release_id}"
+        response = requests.delete(url, verify=self.verify_ssl, headers=self.headers, timeout=10)
+        if response.status_code != 204:
+            raise requests.exceptions.HTTPError(
+                f"Failed to delete release: {response.status_code} - {response.text}"
+            )
 
     def create_release(
         self,
@@ -85,20 +162,40 @@ class GitHubClient:
         draft: bool = False,
         prerelease: bool = False,
     ) -> Dict:
-        """Create a new release on GitHub."""
-        url = f'{self.api_url}/repos/{owner}/{repo}/releases'
+        """Create a new release on GitHub.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            tag_name: Git tag name for the release
+            name: Release name
+            body: Release description
+            draft: Whether this is a draft release (defaults to False)
+            prerelease: Whether this is a prerelease (defaults to False)
+
+        Returns:
+            Dict containing the created release information
+
+        Raises:
+            Exception: If the API request fails
+        """
+        url = f"{self.api_url}/repos/{owner}/{repo}/releases"
 
         payload = {
-            'tag_name': tag_name,
-            'name': name,
-            'body': body,
-            'draft': draft,
-            'prerelease': prerelease,
+            "tag_name": tag_name,
+            "name": name,
+            "body": body,
+            "draft": draft,
+            "prerelease": prerelease,
         }
 
-        response = requests.post(url, verify=self.verifySSL, headers=self.headers, json=payload)
+        response = requests.post(
+            url, verify=self.verify_ssl, headers=self.headers, json=payload, timeout=10
+        )
 
         if response.status_code in (200, 201):
             return response.json()
-        else:
-            raise Exception(f'Failed to create release: {response.status_code} - {response.text}')
+
+        raise requests.exceptions.HTTPError(
+            f"Failed to create release: {response.status_code} - {response.text}"
+        )

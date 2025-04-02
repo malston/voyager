@@ -28,15 +28,26 @@ class ReleaseHelper:
         params_dir (str): Full path to the params repository
     """
 
-    def __init__(self, repo: str, owner: str = "Utilities-tkgieng", params_repo: str = "params"):
+    def __init__(
+        self,
+        repo: str,
+        owner: str = "Utilities-tkgieng",
+        params_repo: str = "params",
+        repo_dir: str = None,
+        params_dir: str = None,
+        token: str = None,
+    ) -> None:
         self.repo = repo
         self.owner = owner
         self.params_repo = params_repo
         self.git_helper = GitHelper(repo=repo)
+        self.github_token = token = os.getenv("GITHUB_TOKEN")
         self.github_client = GitHubClient()
         self.home = str(Path.home())
-        self.repo_dir = os.path.join(self.home, "git", self.repo)
-        self.params_dir = os.path.join(self.home, "git", self.params_repo)
+        self.repo_dir = repo_dir if repo_dir else os.path.join(self.home, "git", self.repo)
+        self.params_dir = (
+            params_dir if params_dir else os.path.join(self.home, "git", self.params_repo)
+        )
 
         if not self.git_helper.check_git_repo():
             raise ValueError("Repository is not a git repository")

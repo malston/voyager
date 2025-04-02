@@ -35,6 +35,7 @@ class DemoReleasePipeline:
         self,
         foundation: str,
         repo: str,
+        repo_dir: str,
         owner: str,
         branch: str,
         params_repo: str,
@@ -42,7 +43,6 @@ class DemoReleasePipeline:
         release_tag: str,
         release_body: str,
         dry_run: bool = False,
-        git_dir: str = None,
     ):
         self.foundation = foundation
         self.branch = branch
@@ -54,30 +54,34 @@ class DemoReleasePipeline:
         self.repo = repo
         self.params_repo = params_repo
 
+        self.github_token = os.getenv("GITHUB_TOKEN")
+        if not self.github_token:
+            raise ValueError("GITHUB_TOKEN env must be set before executing this script")
+
         # Store the repo directory path
-        if git_dir is None:
-            git_dir = os.path.expanduser("~/git")
-        self.repo_dir = os.path.join(git_dir, self.repo)
+        self.repo_dir = repo_dir
         if not os.path.isdir(self.repo_dir):
             raise ValueError(f"Could not find repo directory: {self.repo_dir}")
 
-        self.github_token = os.getenv("GITHUB_TOKEN")
         if self.owner != "Utilities-tkgieng":
             self.git_helper = GitHelper(repo=f"{repo}-{owner}")
             self.release_helper = ReleaseHelper(
-                repo=self.repo, owner=self.owner, params_repo=f"{self.params_repo}-{self.owner}"
+                repo=self.repo,
+                owner=self.owner,
+                params_repo=f"{self.params_repo}-{self.owner}",
+                token=self.github_token,
             )
         else:
             self.git_helper = GitHelper(repo=self.repo)
             self.release_helper = ReleaseHelper(
-                repo=self.repo, owner=self.owner, params_repo=self.params_repo
+                repo=self.repo,
+                owner=self.owner,
+                params_repo=self.params_repo,
+                token=self.github_token,
             )
 
         if not self.git_helper.check_git_repo():
             raise ValueError("Repository is not a git repository")
-
-        if not self.github_token:
-            raise ValueError("GITHUB_TOKEN env must be set before executing this script")
 
     def is_semantic_version(self, version: str) -> bool:
         """Check if a string is a valid semantic version number.
@@ -92,7 +96,11 @@ class DemoReleasePipeline:
         return bool(re.match(pattern, version))
 
     def run_git_command(
-        self, command: list, dry_run: Optional[bool] = None, **kwargs
+        self,
+        command: list,
+        repo_dir: Optional[str] = None,
+        dry_run: Optional[bool] = None,
+        **kwargs,
     ) -> Optional[subprocess.CompletedProcess]:
         """Run a git command in the repo directory.
 
@@ -104,6 +112,7 @@ class DemoReleasePipeline:
         Returns:
            Optional[subprocess.CompletedProcess]: The result of running the command, or None if dry-run
         """
+        repo_dir = repo_dir if repo_dir else self.repo_dir
         dry_run = self.dry_run if dry_run is None else dry_run
         if dry_run:
             self.git_helper.info(f'[DRY RUN] Would run git command: {" ".join(command)}')
@@ -112,7 +121,7 @@ class DemoReleasePipeline:
         # Set check=False by default unless overridden in kwargs
         if "check" not in kwargs:
             kwargs["check"] = False
-        return subprocess.run(command, cwd=self.repo_dir, **kwargs)
+        return subprocess.run(command, cwd=repo_dir, **kwargs)
 
     def validate_git_tag(self, version: str) -> bool:
         """Check if a git tag exists for the given version."""
@@ -197,7 +206,7 @@ class DemoReleasePipeline:
         try:
             # Get all releases to find the one with matching tag
             releases = self.release_helper.get_releases()
-        except Exception as e:
+        except (ConnectionError, ValueError, RuntimeError, IOError) as e:
             self.git_helper.error(f"Error fetching releases: {str(e)}")
             return
 
@@ -252,7 +261,7 @@ class DemoReleasePipeline:
 
             # Update version file
             version_file = os.path.join(self.repo_dir, "version")
-            with open(version_file, "w") as f:
+            with open(version_file, "w", encoding="utf-8") as f:
                 f.write(previous_version)
 
             # Commit changes
@@ -351,6 +360,7 @@ class DemoReleasePipeline:
 
     def run_release_pipeline(self) -> None:
         """Run the release pipeline."""
+        release_pipeline = f"tkgi-{self.repo}-release"
         if self.owner != "Utilities-tkgieng":
             release_pipeline = f"tkgi-{self.repo}-{self.owner}-release"
 
@@ -555,7 +565,7 @@ class DemoReleasePipeline:
             return
 
         try:
-            with open(version_file, "r") as f:
+            with open(version_file, "r", encoding="utf-8") as f:
                 current_version = f.read().strip()
         except Exception as e:
             self.git_helper.error(f"Error reading version file: {str(e)}")
@@ -695,10 +705,23 @@ Options:
     )
 
     args = parser.parse_args()
+    git_dir = args.git_dir
+    if git_dir is None:
+        git_dir = os.path.expanduser("~/git")
+
+    repo_dir = os.path.join(git_dir, args.repo)
+    # Check if repo ends with the owner
+    if args.repo.endswith(args.owner):
+        args.repo = args.repo[: -len(args.owner) - 1]
+    elif args.owner != "Utilities-tkgieng":
+        repo_dir = os.path.join(git_dir, f"{args.repo}-{args.owner}")
+    if not os.path.isdir(repo_dir):
+        raise ValueError(f"Could not find repo directory: {repo_dir}")
 
     pipeline = DemoReleasePipeline(
         foundation=args.foundation,
         repo=args.repo,
+        repo_dir=repo_dir,
         owner=args.owner,
         branch=args.branch,
         params_repo=args.params_repo,
@@ -706,7 +729,6 @@ Options:
         release_tag=args.tag,
         release_body=args.message,
         dry_run=args.dry_run,
-        git_dir=args.git_dir,
     )
 
     pipeline.run()

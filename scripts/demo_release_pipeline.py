@@ -583,6 +583,9 @@ class DemoReleasePipeline:
             else:
                 self.git_helper.info("Version reversion cancelled")
 
+        # Checkout the original branch
+        if self.branch == "version":
+            self.branch = "develop"
         self.run_git_command(["git", "checkout", self.branch], check=True)
 
     def run(self) -> None:

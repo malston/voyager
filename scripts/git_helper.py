@@ -50,7 +50,7 @@ class GitHelper:
         except (git.InvalidGitRepositoryError, git.NoSuchPathError) as err:
             raise ValueError("Current directory is not a git repository") from err
 
-    def check_git_repo(self, repo: Optional[str] = None) -> bool | None:
+    def check_git_repo(self, repo: Optional[str] = None) -> bool:
         """Check if repo is a git repository."""
         repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
         try:

@@ -134,6 +134,7 @@ class ReleaseHelper:
             )
             try:
                 if delete_tag:
+                    self.git_helper.pull()
                     self.git_helper.delete_tag(release_tag)
                 return True
             except requests.exceptions.RequestException as e:
@@ -142,6 +143,7 @@ class ReleaseHelper:
         try:
             self.github_client.delete_release(self.owner, self.repo, release_id)
             if delete_tag:
+                self.git_helper.pull()
                 self.git_helper.delete_tag(release_tag)
             return True
         except requests.exceptions.RequestException as e:

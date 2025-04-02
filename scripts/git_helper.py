@@ -59,6 +59,14 @@ class GitHelper:
         except (git.InvalidGitRepositoryError, git.NoSuchPathError):
             return False
 
+    def pull(self, repo: Optional[str] = None) -> None:
+        """Pull changes from remote."""
+        repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
+        try:
+            subprocess.run(["git", "pull", "-q"], cwd=repo_dir, check=True)
+        except subprocess.CalledProcessError as e:
+            self.error(f"Failed to pull changes: {e}")
+
     def pull_all(self, repo: Optional[str] = None) -> None:
         """Pull all changes from all remotes."""
         repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)

@@ -158,7 +158,9 @@ class DemoReleasePipeline:
                 self.git_helper.error(f"No git tag found for version: release-v{version}")
                 self.git_helper.info("Available release tags:")
                 # Show available tags for reference
-                subprocess.run(["git", "tag", "-l", "release-v*"], check=True)
+                subprocess.run(
+                    ["git", "tag", "-l", "|", "sort", "-V", "|", "grep", "release-v*"], check=True
+                )
                 retry = input("Would you like to try again? [yN] ")
                 if not retry.lower().startswith("y"):
                     return None
@@ -256,7 +258,12 @@ class DemoReleasePipeline:
 
         try:
             # Change to version branch
-            self.run_git_command(["git", "checkout", "version"], check=True)
+            self.run_git_command(
+                ["git", "checkout", "version"],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+            )
             self.run_git_command(["git", "pull", "-q", "origin", "version"], check=True)
 
             # Update version file
@@ -569,7 +576,12 @@ class DemoReleasePipeline:
                 current_version = f.read().strip()
         except Exception as e:
             self.git_helper.error(f"Error reading version file: {str(e)}")
-            self.run_git_command(["git", "checkout", self.branch], check=True)
+            self.run_git_command(
+                ["git", "checkout", self.branch],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+            )
             return
 
         self.git_helper.info(f"The current version is: {current_version}")
@@ -586,7 +598,13 @@ class DemoReleasePipeline:
         # Checkout the original branch
         if self.branch == "version":
             self.branch = "develop"
-        self.run_git_command(["git", "checkout", self.branch], check=True)
+        self.run_git_command(
+            ["git", "checkout", self.branch],
+            check=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+        )
+        self.run_git_command(["git", "pull", "-q"], dry_run=False, check=True)
 
     def run(self) -> None:
         """Run the complete demo release pipeline."""

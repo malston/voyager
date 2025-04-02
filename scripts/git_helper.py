@@ -88,7 +88,11 @@ class GitHelper:
         repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
         try:
             result = subprocess.run(
-                ["git", "tag", "-l"], capture_output=True, text=True, check=True, cwd=repo_dir
+                ["git", "tag", "-l", "|", "sort", "-V"],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=repo_dir,
             )
             return result.stdout.strip().split("\n")
         except subprocess.CalledProcessError as e:

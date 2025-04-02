@@ -15,7 +15,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from tabulate import tabulate
 
 # Add the project root to the Python path
 PROJECT_ROOT = str(Path(__file__).parent.parent)
@@ -110,6 +109,7 @@ def print_available_releases(releases: list) -> None:
 
 
 def main() -> None:
+    """Main function to delete a GitHub release."""
     args = parse_args()
     repo = "ns-mgmt"
 
@@ -151,7 +151,7 @@ def main() -> None:
         if not user_input.lower().startswith("y"):
             return
 
-    if not release_helper.delete_github_release(args.release_tag, not args.no_tag_deletion):
+    if not release_helper.delete_github_release(args.release_tag):
         git_helper.error("Failed to delete GitHub release")
 
     if not args.no_tag_deletion:

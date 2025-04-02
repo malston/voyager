@@ -7,7 +7,7 @@ import sys
 import subprocess
 import argparse
 import requests
-from git_helper import GitHelper
+from scripts.git_helper import GitHelper
 from voyager.github import GitHubClient
 
 

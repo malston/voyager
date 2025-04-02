@@ -119,12 +119,20 @@ class ReleaseHelper:
                 return -1
         return 0
 
+    def get_github_release_by_tag(self, release_tag: str) -> dict | None:
+        """Get a GitHub release by tag."""
+        try:
+            return self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)
+        except requests.exceptions.RequestException as e:
+            self.git_helper.error(f"Failed to get release by tag: {e}")
+            return None
+
     def delete_github_release(self, release_tag: str, delete_tag: bool = True) -> bool:
         """Delete a GitHub release and optionally its tag."""
         # Get the release ID from the tag name
         release_id = None
         try:
-            release = self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)
+            release = self.get_github_release_by_tag(release_tag)
             release_id = release.get("id") if release else None
         except requests.exceptions.RequestException as e:
             self.git_helper.warn(f"Failed to find release: {e}")

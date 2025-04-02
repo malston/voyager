@@ -14,6 +14,7 @@
 import argparse
 import sys
 from pathlib import Path
+from tabulate import tabulate
 
 # Add the project root to the Python path
 PROJECT_ROOT = str(Path(__file__).parent.parent)
@@ -98,6 +99,16 @@ def main() -> None:
         git_helper.error(f"{repo} is not a git repository")
         return
     release_helper = ReleaseHelper(repo=repo, owner=args.owner)
+
+    release = release_helper.get_github_release_by_tag(args.release_tag)
+    if not release:
+        git_helper.error(f"Release {args.release_tag} not found")
+        releases = release_helper.get_releases()
+        print(tabulate(releases, headers="keys", tablefmt="grid"))
+        print(f"Available releases:")
+        for release in releases:
+            print(f"{release['tag_name']} - {release['name']}")
+        return
 
     try:
         if not args.non_interactive:

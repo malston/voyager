@@ -159,7 +159,12 @@ class DemoReleasePipeline:
                 self.git_helper.info("Available release tags:")
                 # Show available tags for reference
                 subprocess.run(
-                    ["git", "tag", "-l", "|", "sort", "-V", "|", "grep", "release-v*"], check=True
+                    ["git", "tag", "-l", "|", "sort", "-V", "|", "grep", "release-v*"],
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    cwd=self.repo_dir,
                 )
                 retry = input("Would you like to try again? [yN] ")
                 if not retry.lower().startswith("y"):

@@ -87,8 +87,10 @@ class GitHelper:
         """Get all git tags."""
         repo_dir = self.repo_dir if repo is None else os.path.join(self.home, "git", repo)
         try:
+            # Use shell=True to allow pipe operator
             result = subprocess.run(
-                ["git", "tag", "-l", "|", "sort", "-V"],
+                "git tag -l | sort -V",
+                shell=True,
                 capture_output=True,
                 text=True,
                 check=True,

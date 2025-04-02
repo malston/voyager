@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from typing import List
+from typing import List, Union, Optional
 from pathlib import Path
 import os
 import sys
@@ -119,7 +119,7 @@ class ReleaseHelper:
                 return -1
         return 0
 
-    def get_github_release_by_tag(self, release_tag: str) -> dict | None:
+    def get_github_release_by_tag(self, release_tag: str) -> Optional[dict]:
         """Get a GitHub release by tag."""
         try:
             return self.github_client.find_release_by_tag(self.owner, self.repo, release_tag)

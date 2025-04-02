@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -15,6 +14,8 @@ from scripts.git_helper import GitHelper
 
 
 class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Custom help formatter to modify the help output."""
+
     def format_help(self):
         help_text = super().format_help()
         # Remove the default options section
@@ -25,6 +26,8 @@ class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+
     parser = argparse.ArgumentParser(
         prog="update_params_release_tag.py",
         description="Create a new release",
@@ -62,6 +65,7 @@ Options:
 
 
 def main() -> None:
+    """Main function to update the release tag in the params repo."""
     args = parse_args()
     repo = args.repo
     params_repo = args.params_repo
@@ -75,6 +79,7 @@ def main() -> None:
         args.repo = args.repo[: -len(args.owner) - 1]
     if args.params_repo.endswith(args.owner):
         args.params_repo = args.params_repo[: -len(args.owner) - 1]
+
     # Check if repo ends with the owner
     if args.owner != "Utilities-tkgieng":
         repo_dir = os.path.join(git_dir, f"{repo}-{args.owner}")

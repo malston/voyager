@@ -39,6 +39,7 @@ class DemoReleasePipeline:
         owner: str,
         branch: str,
         params_repo: str,
+        params_dir: str,
         params_branch: str,
         release_tag: str,
         release_body: str,
@@ -53,6 +54,7 @@ class DemoReleasePipeline:
         self.owner = owner
         self.repo = repo
         self.params_repo = params_repo
+        self.params_dir = params_dir
 
         self.github_token = os.getenv("GITHUB_TOKEN")
         if not self.github_token:
@@ -63,22 +65,14 @@ class DemoReleasePipeline:
         if not os.path.isdir(self.repo_dir):
             raise ValueError(f"Could not find repo directory: {self.repo_dir}")
 
-        if self.owner != "Utilities-tkgieng":
-            self.git_helper = GitHelper(repo=f"{repo}-{owner}")
-            self.release_helper = ReleaseHelper(
-                repo=self.repo,
-                owner=self.owner,
-                params_repo=f"{self.params_repo}-{self.owner}",
-                token=self.github_token,
-            )
-        else:
-            self.git_helper = GitHelper(repo=self.repo)
-            self.release_helper = ReleaseHelper(
-                repo=self.repo,
-                owner=self.owner,
-                params_repo=self.params_repo,
-                token=self.github_token,
-            )
+        self.git_helper = GitHelper(repo=self.repo, repo_dir=self.repo_dir)
+        self.release_helper = ReleaseHelper(
+            repo=self.repo,
+            owner=self.owner,
+            params_repo=self.params_repo,
+            params_dir=self.params_dir,
+            token=self.github_token,
+        )
 
         if not self.git_helper.check_git_repo():
             raise ValueError("Repository is not a git repository")
@@ -736,11 +730,21 @@ Options:
         git_dir = os.path.expanduser("~/git")
 
     repo_dir = os.path.join(git_dir, args.repo)
+    params_dir = os.path.join(git_dir, args.params_repo)
+
     # Check if repo ends with the owner
     if args.repo.endswith(args.owner):
         args.repo = args.repo[: -len(args.owner) - 1]
-    elif args.owner != "Utilities-tkgieng":
+
+    # Check if params_repo ends with the owner
+    if args.params_repo.endswith(args.owner):
+        args.params_repo = args.params_repo[: -len(args.owner) - 1]
+
+    # Check if repo ends with the owner
+    if args.owner != "Utilities-tkgieng":
         repo_dir = os.path.join(git_dir, f"{args.repo}-{args.owner}")
+        params_dir = os.path.join(git_dir, f"{args.params_repo}-{args.owner}")
+
     if not os.path.isdir(repo_dir):
         raise ValueError(f"Could not find repo directory: {repo_dir}")
 
@@ -751,6 +755,7 @@ Options:
         owner=args.owner,
         branch=args.branch,
         params_repo=args.params_repo,
+        params_dir=params_dir,
         params_branch=args.params_branch,
         release_tag=args.tag,
         release_body=args.message,
